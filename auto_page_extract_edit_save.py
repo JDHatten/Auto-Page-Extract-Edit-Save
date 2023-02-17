@@ -32,7 +32,7 @@ Requirements:
     - - https://www.rarlab.com/rar/unrarw32.exe (will extract UnRAR.exe for Windows systems)
 
 TODO:
-    [] Create log file.
+    [X] Create log file.
     [] Support for other comic book file types (CBZ,CB7,CBC,etc)
     [] Add more image editing options that make sense for pages of book/magazine/etc.
         [X] Combine two pages vertically or horizontal.
@@ -71,19 +71,11 @@ create_log_file = True
 default_save_dir = Path(__file__).parent
 
 
-# File Meta Data
-FILE_META_PATH = 0                  # DATA: 'Text'
-FILE_META_SIZE = 1                  # GB/MB/KB/BYTES : Number
-FILE_META_ACCESSED = 2              # YEAR/MONTH/... : Number
-FILE_META_MODIFIED = 3              # YEAR/MONTH/... : Number
-FILE_META_CREATED = 4               # YEAR/MONTH/... : Number
-FILE_META_METADATA = 4              # YEAR/MONTH/... : Number
-
 # Preset Options
 DESCRIPTION = 20
 PAGES_TO_EXTRACT = 0
-CHANGE_HEIGHT = 1
-CHANGE_WIDTH = 2
+CHANGE_WIDTH = 1
+CHANGE_HEIGHT = 2
 KEEP_ASPECT_RATIO = 3
 ROTATE_PAGES = 4
 COMBINE_PAGES = 5
@@ -111,12 +103,10 @@ IMAGE_DATA = 167
 # Image Modifier
 NO_CHANGE = 0
 CHANGE_TO = 1
-ADD = 2
-SUBTRACT = 3
-MULTIPLY = 4
-DIVIDE = 5
-UPSCALE = 6
-DOWNSCALE = 7
+MODIFY_BY_PIXELS = 2
+MODIFY_BY_PERCENT = 3
+UPSCALE = 4
+DOWNSCALE = 5
 
 # Layout
 HORIZONTAL = 8
@@ -128,20 +118,25 @@ INSERT_FILE_NAME = 0
 INSERT_PAGE_NAME = 1
 INSERT_COUNTER = 2
 
-ALL = 9999
-
 # Image Format
-BMP = '.bmp'  # Windows bitmaps: *.bmp
+BMP = ('Windows Bitmaps', '.bmp')
 #EXR = '.exr'  # OpenEXR Image files: *.exr
 #HDR = '.hdr'  # Radiance HDR: *.hdr, *.pic
-JPG = '.jpg'  # JPEG files: *.jpeg, *.jpg, *.jpe
-JP2 = '.jp2'  # JPEG 2000 files: *.jp2
-PBM = '.pbm'  # Portable image format: *.pbm, *.pgm, *.ppm *.pxm, *.pnm
+#JPG = '.jpg'  # JPEG files: *.jpeg, *.jpg, *.jpe
+JPG = ('JPEG', '.jpg', '.jpeg', '.jpg', '.jpe')
+#JP2 = '.jp2'  # JPEG 2000 files: *.jp2
+JP2 = ('JPEG 2000', '.jp2')
+#PBM = '.pbm'  # Portable image format: *.pbm, *.pgm, *.ppm *.pxm, *.pnm
+PBM = ('Portable Image Format', '.pbm', '.pgm', '.ppm', '.pxm', '.pnm')
 #PFM = '.pfm'  # PFM files: *.pfm
-PNG = '.png'  # Portable Network Graphics: *.png
-RAS = '.ras'  # Sun Rasters: *.ras, *.sun, *.sr
-TIF = '.tif'  # TIFF files: *.tiff, *.tif
-WEB = '.webp' # WebP: *.webp
+#PNG = '.png'  # Portable Network Graphics: *.png
+PNG = ('Portable Network Graphics', '.png')
+#RAS = '.ras'  # Sun Rasters: *.ras, *.sun, *.sr
+RAS = ('Sun Rasters', '.ras', '.ras', '.sun', '.sr')
+#TIF = '.tif'  # TIFF files: *.tiff, *.tif
+TIF = ('TIFF', '.tif', '.tiff')
+#WEB = '.webp' # WebP: *.webp
+WEB = ('Web Picture', '.webp')
 
 # Extra Parameter
 QUALITY = 0
@@ -151,9 +146,9 @@ PROGRESSIVE = 3
 #TRANSPARENCY = 4
 
 # Resampling Filter
-NEAREST = 10
-BILINEAR = 11
-BICUBIC = 12
+NEAREST = 0
+BILINEAR = 1
+BICUBIC = 2
 
 # CBR/RAR File Meta Data
 FILENAME = 0
@@ -183,15 +178,15 @@ RAR_OS_MSDOS = 0    # MSDOS (only in RAR3)
 
 
 ### Select the default preset to use here. Can be changed again once script is running.
-selected_preset = 1
+selected_preset = 3
 
 preset0 = { #           : Defaults          # If option omitted, the default value will be used.
   DESCRIPTION           : '',               # Description of this preset.
   PAGES_TO_EXTRACT      : (1,-1),           # (1,-1) = All Pages. Examples: Range of Pages = ('Starting Page','Ending Page') or Specific Pages = [1,3,6,-1] or One Page = 3
                                             # - Negative numbers start from the last page and count backwards. Example: If 50 total pages, -1 = 50 and -7 = 43.
                                             # - Ranged numbers outside the bounds of the total pages will be forced inbounds and specific out-of-bound numbers will be ignored.
-  CHANGE_HEIGHT         : NO_CHANGE,        # Modify the height of all extracted pages. Example: (Modifier, Number), NO_CHANGE = 0
-  CHANGE_WIDTH          : NO_CHANGE,        # Modifiers: CHANGE_TO, ADD, SUBTRACT, MULTIPLY, DIVIDE, UPSCALE, DOWNSCALE
+  CHANGE_WIDTH          : NO_CHANGE,        # Modify the width or height of all extracted pages. Numbers can be + or -, and percents = 50 or (in qoutes) '50%'.
+  CHANGE_HEIGHT         : NO_CHANGE,        # - Example: (Modifier, Number)  Modifiers: NO_CHANGE, CHANGE_TO, MODIFY_BY_PIXELS, MODIFY_BY_PERCENT, UPSCALE, DOWNSCALE
   KEEP_ASPECT_RATIO     : True,             # Keep aspect ratio only if one size, width or height, has changed.
   ROTATE_PAGES          : None,             # Rotate angle in degrees counter clockwise any or all pages from PAGES_TO_EXTRACT.
                                             # - Example: All Pages = Degrees or Specific Pages = {1:90, 2:180,...}
@@ -202,7 +197,7 @@ preset0 = { #           : Defaults          # If option omitted, the default val
   SEARCH_SUB_DIRS       : False,            # After searching a directory also search it's sub-directories if True.
   OVERWRITE_FILES       : False,            # If file with the same name and path already exists overwrite it if True.
   MODIFY_FILE_NAMES     : None,             # Rename extracted pages with a modified file name. File Name Modifier: INSERT_FILE_NAME, INSERT_PAGE_NAME, INSERT_COUNTER
-                                            # - Example: ('Start-', INSERT_FILE_NAME,'-X-',INSERT_PAGE_NAME) = 'Start-FileName-X-Page001.jpg'
+                                            # - Example: ['Start-', INSERT_FILE_NAME,'-X-',INSERT_PAGE_NAME] = 'Start-FileName-X-Page001.jpg'
   SAVE_DIR_PATH         : default_save_dir, # Absolute or relative paths accepted. Default: r'{this script root path}/{CBR file name}/'
                                             # - Use a List to change save directory path on each page. Example: ['path/to/dir1', 'path/to/dir2',...]
                                             # - The save paths index will repeat if the amount of pages is greater than this list size.
@@ -220,7 +215,7 @@ preset1 = {             # Example Preset 1
   DESCRIPTION           : 'Create thumbnail images of first page (160p).',
   PAGES_TO_EXTRACT      : 1,
   CHANGE_HEIGHT         : (CHANGE_TO, 160),
-  CHANGE_WIDTH          : NO_CHANGE,
+  CHANGE_HEIGHT         : 160,
   KEEP_ASPECT_RATIO     : True,
   OVERWRITE_FILES       : True
 }
@@ -235,7 +230,7 @@ preset3 = {             # TESTING
                            'Downscaled height to 1080p. '+
                            'Combine fourth and fifth pages horizontally. '+
                            'Save each page in a different directory.'),
-  PAGES_TO_EXTRACT      : (-1,-10),
+  #PAGES_TO_EXTRACT      : (-1,-10),
   #PAGES_TO_EXTRACT      : (-10, -1),
   #PAGES_TO_EXTRACT      : (10),
   #PAGES_TO_EXTRACT      : (10, -1),
@@ -243,8 +238,9 @@ preset3 = {             # TESTING
   #PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
   PAGES_TO_EXTRACT      : [1,4,5,-1],
   #PAGES_TO_EXTRACT      : [10],
-  CHANGE_HEIGHT         : (DOWNSCALE, 1080),
   CHANGE_WIDTH          : NO_CHANGE,
+  #CHANGE_HEIGHT         : (DOWNSCALE, 1080),
+  CHANGE_HEIGHT         : (MODIFY_BY_PERCENT, 50),
   KEEP_ASPECT_RATIO     : True,
   #ROTATE_PAGES          : 180,
   #ROTATE_PAGES          : {1:90, 4:180, 5:90, -1:180},
@@ -254,7 +250,7 @@ preset3 = {             # TESTING
   #CHANGE_IMAGE_FORMAT   : PNG,
   OVERWRITE_FILES       : True,
   #MODIFY_FILE_NAMES     : (INSERT_FILE_NAME,'-01', ' (', INSERT_PAGE_NAME, ')'),
-  MODIFY_FILE_NAMES     : (INSERT_FILE_NAME,'-01','--',INSERT_COUNTER),
+  MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-01','--',INSERT_COUNTER],
   #SAVE_DIR_PATH         : r'test\dir',
   SAVE_DIR_PATH         : [r'test\dir1',r'test\dir2',r'test\dir3'],
   KEEP_FILE_PATHS_INTACT: False
@@ -293,12 +289,7 @@ def changePreset(preset, all_the_data = {}):
 ###     (all_the_data) A Dictionary of all the details on how to handle CBR files and logs of everthing done so far.
 ###     --> Returns a [Dictionary]
 def findCBRFiles(path, all_the_data):
-    
-    #if not Path(path).exists():
-    #    return all_the_data
-    
     search_sub_dirs = all_the_data.get(SEARCH_SUB_DIRS, False)
-    
     paths = MakeList(path)
     
     for path in paths:
@@ -393,7 +384,6 @@ def preparePageData(cbr_file_path, all_the_data):
 ###     (cbr_file_path) Path to a CBR file.
 ###     --> Returns a [Dictionary]
 def convertPageNumbersToIndexes(all_the_data, cbr_file_path):
-    
     pages_to_extract = all_the_data.get(PAGES_TO_EXTRACT)
     total_pages = len(all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA])
     page_indexes = []
@@ -431,7 +421,6 @@ def convertPageNumbersToIndexes(all_the_data, cbr_file_path):
 ###     (all_the_data) A Dictionary of all the details on how to handle CBR files and logs of everthing done so far.
 ###     --> Returns a [Dictionary]
 def extractEditSavePages(all_the_data):
-    
     cbr_file_paths = all_the_data[LOG_DATA][CBR_FILE_PATHS]
     
     for cbr_file_path in cbr_file_paths:
@@ -452,7 +441,6 @@ def extractEditSavePages(all_the_data):
 ###     (cbr_file_path) A Path to a CBR file.
 ###     --> Returns a [Dictionary]
 def extractPages(all_the_data, cbr_file_path):
-    
     page_indexes = all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_INDEXES]
     cbrar_file = rarfile.RarFile(cbr_file_path)
     page_meta_data = all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA]
@@ -480,7 +468,6 @@ def extractPages(all_the_data, cbr_file_path):
 ###     (cbr_file_path) A Path to a CBR file.
 ###     --> Returns a [Dictionary]
 def modifyPages(all_the_data, cbr_file_path):
-    
     page_indexes = all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_INDEXES]
     page_meta_data = all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA]
     
@@ -622,9 +609,7 @@ def modifyPages(all_the_data, cbr_file_path):
 ###     (cbr_file_path) A Path to a CBR file.
 ###     --> Returns a [Dictionary]
 def savePages(all_the_data, cbr_file_path):
-    
     page_meta_data = all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA]
-    
     overwrite_files = all_the_data.get(OVERWRITE_FILES, False)
     keep_file_paths_intact = all_the_data.get(KEEP_FILE_PATHS_INTACT, True)
     page_images = all_the_data.get(IMAGE_DATA)
@@ -708,7 +693,7 @@ def createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, root_sav
     else:
         file_name = archived_file_path.stem
     if format_change:
-        file_ext = format_change
+        file_ext = format_change[1]
     else:
         file_ext = archived_file_path.suffix
     
@@ -864,6 +849,98 @@ def rotatePage(image, angle = 0, resample = NEAREST):
 ###     --> Returns a [Boolean]
 def createLogFile(all_the_data, log_file_path = None):
     log_file_created = False
+    base_arrow = '-------> '
+    
+    log_data = all_the_data.get(LOG_DATA)
+    
+    if log_data:
+        page_files_extracted, page_files_saved, page_edit_errors, page_save_errors = getLogNumbers(all_the_data)
+    else:
+        print('\nNo CBR page log data found.')
+        return False
+    
+    # Print general details of CBR page created
+    text_lines = []
+    text_lines.append('=================================')
+    text_lines.append('= Auto Page Extract, Edit, Save =')
+    text_lines.append('=  for CBR Files     - Log File =')
+    text_lines.append('=================================')
+    text_lines.append(f'- Total Pages Extracted: {page_files_extracted}')
+    text_lines.append(f'- Total Pages Saved: {page_files_saved-page_save_errors}')
+    if page_save_errors:
+        text_lines.append(f'- Total Pages Not Saved Due To Errors: {page_save_errors}')
+    if page_edit_errors:
+        text_lines.append(f'- Total Pages That Failed Editing*: {page_edit_errors}')
+        text_lines.append('*If an error happens while editing a page, it still keeps it\'s previous edits and can still be saved.')
+    
+    print_text_lines = text_lines.copy()
+    print('\n'+'\n'.join(print_text_lines))
+    
+    # Only create a log file when pages are saved or errors happened.
+    if page_files_saved + page_edit_errors == 0:
+        return False
+    
+    if create_log_file:
+        
+        if not log_file_path:
+            root_path = Path(__file__).parent
+            log_file_name = f'{Path(__file__).stem}__log.txt'
+            log_file_path = Path(PurePath().joinpath(root_path, log_file_name))
+        
+        desc = all_the_data.get(DESCRIPTION)
+        if desc:
+            text_lines.append('\nDescription of the preset used to extract, edit, and save page files:')
+            text_lines.append(f'  {desc}')
+        
+        for cbr_file_path, page_data in log_data[PAGE_DATA].items():
+            text_lines.append('\nCBR File Path')
+            text_lines.append(f'  {cbr_file_path}')
+            
+            page_save_paths = page_data.get(PAGE_SAVE_PATHS, {})
+            page_edit_errors = page_data.get(PAGE_EDIT_ERRORS, {})
+            page_save_errors = page_data.get(PAGE_SAVE_ERRORS, {})
+            page_edits_made = page_data.get(PAGE_EDITS_MADE, {})
+            pages_combined = page_edits_made.get(COMBINE_PAGES, {})
+            
+            for page_index in page_data[PAGE_INDEXES]:
+                
+                arrow = base_arrow[len(str(page_index)):]
+                
+                if page_index in page_save_paths:
+                    
+                    if page_save_errors[page_index]:
+                        text_lines.append(f'    Page {page_index+1} {arrow}{page_save_errors[page_index]}')
+                    
+                    else:
+                        page_index_str = str(page_index+1)
+                        
+                        # Check if this is a combined page (combined index: #-#)
+                        if not page_edit_errors[page_index]:
+                            if page_index in pages_combined:
+                                page_index_str += f'-{pages_combined[page_index]+1}'
+                        
+                        arrow = base_arrow[len(page_index_str):]
+                        
+                        text_lines.append(f'    Page {page_index_str} {arrow}{page_save_paths[page_index]}')
+                    
+                    if page_edit_errors[page_index]:
+                        text_lines.append(f'                    {page_edit_errors[page_index]}')
+                
+                else:
+                    # Removed because it was combined with another page, only show if there was an error.
+                    if page_index in page_edit_errors:
+                        text_lines.append(f'    Page {page_index+1} {arrow}{page_edit_errors[page_index]}')
+        
+        # Write Log File
+        try:
+            log_file_path.write_text('\n'.join(text_lines), encoding='utf-8', errors='strict', newline=None)
+            log_file_created = log_file_path # return log file path
+        except Exception as error:
+            print(f'\nCouldn\'t save log file due to {type(error).__name__}: {type(error).__doc__}')
+            print(f'{error}\n')
+    
+    else:
+        print('Log file creation turned off.')
     
     return log_file_created
 
