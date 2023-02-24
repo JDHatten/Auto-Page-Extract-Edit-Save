@@ -37,7 +37,7 @@ TODO:
     [] Add more image editing options that make sense for pages of book/magazine/etc.
         [X] Combine two pages vertically or horizontal.
         [X] Rotate pages/images.
-        [] Combine up to 4 pages and add a BOX layout.
+        [] Combine up to 4 pages and add a BOX layout. OR stick with multiple stacked combines?
     [] GUI
     [] Write better error messages.
     [X] Incrementing numbers for page file names.
@@ -100,6 +100,9 @@ PAGE_EDIT_ERRORS = 14
 PAGE_SAVE_ERRORS = 15
 IMAGE_DATA = 167
 
+# Editing Pages
+ALL_PAGES = 9997999
+
 # Image Modifier
 NO_CHANGE = 0
 CHANGE_TO = 1
@@ -109,9 +112,9 @@ UPSCALE = 4
 DOWNSCALE = 5
 
 # Layout
-HORIZONTAL = 8
-VERTICAL = 9
-BOX = 10
+HORIZONTAL = 0
+VERTICAL = 1
+BOX = 2
 
 # File Name Modifiers
 INSERT_FILE_NAME = 0
@@ -235,24 +238,25 @@ preset3 = {             # TESTING
   #PAGES_TO_EXTRACT      : (10),
   #PAGES_TO_EXTRACT      : (10, -1),
   #PAGES_TO_EXTRACT      : (100, -1),
-  #PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
-  PAGES_TO_EXTRACT      : [1,4,5,-1],
+  PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
+  #PAGES_TO_EXTRACT      : [1,4,5,-1],
   #PAGES_TO_EXTRACT      : [10],
   CHANGE_WIDTH          : NO_CHANGE,
   #CHANGE_HEIGHT         : (DOWNSCALE, 1080),
   CHANGE_HEIGHT         : (MODIFY_BY_PERCENT, 50),
   KEEP_ASPECT_RATIO     : True,
-  #ROTATE_PAGES          : 180,
+  ROTATE_PAGES          : 180,
   #ROTATE_PAGES          : {1:90, 4:180, 5:90, -1:180},
+  #ROTATE_PAGES          : {1:90, ALL_PAGES: 180},
   #COMBINE_PAGES         : [(VERTICAL, 1, -1), (HORIZONTAL, 4, 5)],
-  COMBINE_PAGES         : [(HORIZONTAL, 4, 5)],
+  COMBINE_PAGES         : [(HORIZONTAL, 4, 5)], ## TODO: do not delete 2nd image after combine??
   RESAMPLING_FILTER     : BICUBIC,
   #CHANGE_IMAGE_FORMAT   : PNG,
   OVERWRITE_FILES       : True,
   #MODIFY_FILE_NAMES     : (INSERT_FILE_NAME,'-01', ' (', INSERT_PAGE_NAME, ')'),
   MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-01','--',INSERT_COUNTER],
-  #SAVE_DIR_PATH         : r'test\dir',
-  SAVE_DIR_PATH         : [r'test\dir1',r'test\dir2',r'test\dir3'],
+  SAVE_DIR_PATH         : r'test\dir',
+  #SAVE_DIR_PATH         : [r'test\dir1',r'test\dir2',r'test\dir3'],
   KEEP_FILE_PATHS_INTACT: False
 }
 
@@ -268,7 +272,7 @@ def changePreset(preset, all_the_data = {}):
     
     log_data = all_the_data.get(LOG_DATA, {}).copy()
     
-    print(log_data)
+    #print(log_data)
     
     if not log_data:
         all_the_data = preset
@@ -279,7 +283,7 @@ def changePreset(preset, all_the_data = {}):
         all_the_data = preset
         all_the_data[LOG_DATA] = log_data
     
-    print(all_the_data)
+    #print(all_the_data)
     
     return all_the_data
 
@@ -399,7 +403,7 @@ def convertPageNumbersToIndexes(all_the_data, cbr_file_path):
                     page_index = getPageIndex(total_pages, page_number)
                     page_indexes.append(page_index)
                 else:
-                    print(f'Specific page #{page} is out of bounds and will be disregarded.')
+                    print(f'Specific page #{page_number} is out of bounds and will be disregarded.')
         
         elif type(pages_to_extract) == int: # Single Page
             page_indexes = getAllPageIndexesFromRange(total_pages, None, pages_to_extract)
@@ -504,21 +508,39 @@ def modifyPages(all_the_data, cbr_file_path):
     if rotate_pages:
         
         # Rotate All Pages
-        if type(rotate_pages) == int:
+        '''if type(rotate_pages) == int:
             degrees = rotate_pages
             rotate_pages = {}
             page_index_done = True
             for page in page_indexes:
                 rotate_pages[page] = degrees
-        else:
-            page_index_done = False
         
-        for page, degrees in rotate_pages.items():
+        else:
+            page_index_done = False'''
+        
+        # Expand ALL_PAGES to indexes and convert specific pages to indexes.
+        rotate_pages_to_indexes = {}
+        if type(rotate_pages) == dict:
+            for page, degrees in rotate_pages.items():
+                if page != ALL_PAGES:
+                    rotate_pages_to_indexes[getPageIndex(total_pages, page)] = degrees
+                else:
+                    rotate_all_degrees = degrees
+        else:
+            rotate_all_degrees = rotate_pages
+        rotate_indexes = {}
+        for page in page_indexes:
+            if page in rotate_pages_to_indexes:
+                rotate_indexes[page] = rotate_pages_to_indexes[page]
+            else:
+                rotate_indexes[page] = rotate_all_degrees
+        
+        for page_index, degrees in rotate_indexes.items():
             
-            if page_index_done:
+            '''if page_index_done:
                 page_index = page
             else:
-                page_index = getPageIndex(total_pages, page)
+                page_index = getPageIndex(total_pages, page)'''
             
             print(f'Rotate Page: {page_index+1} {degrees} Degress')
             
