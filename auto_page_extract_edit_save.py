@@ -33,14 +33,16 @@ Requirements:
 
 TODO:
     [X] Create log file.
-    [] Support for other comic book file types (CBZ,CB7,CBC,etc)
+    [] Support for other comic book file types (CBZ,CB7,CBC,etc - Many of these use the .cbr extension even though they are not using RAR compression)
     [] Add more image editing options that make sense for pages of book/magazine/etc.
         [X] Combine two pages vertically or horizontal.
         [X] Rotate pages/images.
-        [] Combine up to 4 pages and add a BOX layout. OR stick with multiple stacked combines?
+        [] Combine up to 4 pages and add a BOX layout. OR stick with multiple stacked combines? (2,3 + 2,4 = 2,3,4)
     [] GUI
-    [] Write better error messages.
+    [] Write better error messages. Add errors to log file.
     [X] Incrementing numbers for page file names.
+    [] Extra image format parameters. Optimization, Quality, Subsampling, etc.
+    [] Ask before overwriting files.
     
 '''
 
@@ -114,7 +116,10 @@ DOWNSCALE = 5
 # Layout
 HORIZONTAL = 0
 VERTICAL = 1
-BOX = 2
+#BOX = 2
+
+WIDTH = 0
+HEIGHT = 1
 
 # File Name Modifiers
 INSERT_FILE_NAME = 0
@@ -125,23 +130,17 @@ INSERT_COUNTER = 2
 BMP = ('Windows Bitmaps', '.bmp')
 #EXR = '.exr'  # OpenEXR Image files: *.exr
 #HDR = '.hdr'  # Radiance HDR: *.hdr, *.pic
-#JPG = '.jpg'  # JPEG files: *.jpeg, *.jpg, *.jpe
 JPG = ('JPEG', '.jpg', '.jpeg', '.jpg', '.jpe')
-#JP2 = '.jp2'  # JPEG 2000 files: *.jp2
 JP2 = ('JPEG 2000', '.jp2')
-#PBM = '.pbm'  # Portable image format: *.pbm, *.pgm, *.ppm *.pxm, *.pnm
 PBM = ('Portable Image Format', '.pbm', '.pgm', '.ppm', '.pxm', '.pnm')
 #PFM = '.pfm'  # PFM files: *.pfm
-#PNG = '.png'  # Portable Network Graphics: *.png
 PNG = ('Portable Network Graphics', '.png')
-#RAS = '.ras'  # Sun Rasters: *.ras, *.sun, *.sr
 RAS = ('Sun Rasters', '.ras', '.ras', '.sun', '.sr')
-#TIF = '.tif'  # TIFF files: *.tiff, *.tif
 TIF = ('TIFF', '.tif', '.tiff')
-#WEB = '.webp' # WebP: *.webp
 WEB = ('Web Picture', '.webp')
+SUPPORTED_IMAGE_FORMATS = [BMP, JPG, JP2, PBM, PNG, RAS, TIF, WEB]
 
-# Extra Parameter
+# Extra Parameters
 QUALITY = 0
 SUBSAMPLING = 1
 OPTIMIZE = 2
@@ -181,7 +180,7 @@ RAR_OS_MSDOS = 0    # MSDOS (only in RAR3)
 
 
 ### Select the default preset to use here. Can be changed again once script is running.
-selected_preset = 3
+selected_preset = 4
 
 preset0 = { #           : Defaults          # If option omitted, the default value will be used.
   DESCRIPTION           : '',               # Description of this preset.
@@ -207,7 +206,8 @@ preset0 = { #           : Defaults          # If option omitted, the default val
                                             # - Extracted page file names can be the same if each is saved in a different directory.
   KEEP_FILE_PATHS_INTACT: True,             # When extracting pages/files they may be in one or more folders. So when saving, stick with the same file structure.
                                             # If False, all extracted pages/files will be placed directly in the SAVE_DIR_PATH and there may be file name conflicts.
-}
+}                                           # Note: Any 'pages numbers' that are 'strings' are considered disabled, ignored. Example: 5 -> '5'
+                                            #       This is mainly for use in the app. Page numbers are used in: PAGES_TO_EXTRACT, ROTATE_PAGES, COMBINE_PAGES
 ##TODO: Some preset options:
 #                         "Thumbnail" first page,
 #                         "Preview" get first 3-5 pages,
@@ -228,28 +228,47 @@ preset2 = {             # Example Preset 2
   COMBINE_PAGES         : [(HORIZONTAL, 1, -1)],
   OVERWRITE_FILES       : True
 }
-preset3 = {             # TESTING
+preset3 = {             # Example Preset 3
+  DESCRIPTION           : ('Extract pages 1-7 and downscale height to 1080p. '+
+                           'Combine fourth, fifth, sixth and seventh pages in a box layout. '+
+                           'Save each file with a page number as a PNG.'),
+  PAGES_TO_EXTRACT      : (1,7),
+  CHANGE_WIDTH          : NO_CHANGE,
+  CHANGE_HEIGHT         : (DOWNSCALE, 1080),
+  KEEP_ASPECT_RATIO     : True,
+  COMBINE_PAGES         : [(HORIZONTAL, 4, 5),(HORIZONTAL, 6, 7),(VERTICAL, 4, 6)], # Box Layout
+  RESAMPLING_FILTER     : BICUBIC,
+  CHANGE_IMAGE_FORMAT   : PNG,
+  OVERWRITE_FILES       : True,
+  MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-',INSERT_COUNTER],
+  KEEP_FILE_PATHS_INTACT: False
+}
+preset4 = {             # TESTING
   DESCRIPTION           : ('Get first, fourth, fifth, and last pages. '+
                            'Downscaled height to 1080p. '+
                            'Combine fourth and fifth pages horizontally. '+
                            'Save each page in a different directory.'),
   #PAGES_TO_EXTRACT      : (-1,-10),
+  PAGES_TO_EXTRACT      : (1,-1),
+  PAGES_TO_EXTRACT      : (1,7),
   #PAGES_TO_EXTRACT      : (-10, -1),
   #PAGES_TO_EXTRACT      : (10),
   #PAGES_TO_EXTRACT      : (10, -1),
   #PAGES_TO_EXTRACT      : (100, -1),
-  PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
+  #PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
   #PAGES_TO_EXTRACT      : [1,4,5,-1],
   #PAGES_TO_EXTRACT      : [10],
   CHANGE_WIDTH          : NO_CHANGE,
   #CHANGE_HEIGHT         : (DOWNSCALE, 1080),
   CHANGE_HEIGHT         : (MODIFY_BY_PERCENT, 50),
   KEEP_ASPECT_RATIO     : True,
-  ROTATE_PAGES          : 180,
+  #ROTATE_PAGES          : 180,
   #ROTATE_PAGES          : {1:90, 4:180, 5:90, -1:180},
-  #ROTATE_PAGES          : {1:90, ALL_PAGES: 180},
+  #ROTATE_PAGES          : {4:180, 5:90},
+  #ROTATE_PAGES          : {1:90, ALL_PAGES': 180},
   #COMBINE_PAGES         : [(VERTICAL, 1, -1), (HORIZONTAL, 4, 5)],
-  COMBINE_PAGES         : [(HORIZONTAL, 4, 5)], ## TODO: do not delete 2nd image after combine??
+  COMBINE_PAGES         : [(HORIZONTAL, 4, 5)], ## TODO: do not delete 2nd image after combine and allow multiple same page combines??
+  COMBINE_PAGES         : [(HORIZONTAL, 4, 5),(HORIZONTAL, 6, 7),(VERTICAL, 4, 6)],
   RESAMPLING_FILTER     : BICUBIC,
   #CHANGE_IMAGE_FORMAT   : PNG,
   OVERWRITE_FILES       : True,
@@ -257,11 +276,12 @@ preset3 = {             # TESTING
   MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-01','--',INSERT_COUNTER],
   SAVE_DIR_PATH         : r'test\dir',
   #SAVE_DIR_PATH         : [r'test\dir1',r'test\dir2',r'test\dir3'],
+  #SAVE_DIR_PATH         : {1 : r'test\dir1', 4 : r'test\dir2', -1 : r'test\dir3', ALL_PAGES : r'test\dir' }, ##TODO:
   KEEP_FILE_PATHS_INTACT: False
 }
 
 ### Add any newly created presets to this preset_options List.
-preset_options = [preset0,preset1,preset2,preset3]
+preset_options = [preset0,preset1,preset2,preset3,preset4]
 
 
 ### Change the preset in use, retaining any log data.
@@ -356,10 +376,9 @@ def preparePageData(cbr_file_path, all_the_data):
         PAGE_SAVE_ERRORS : {} ##       or { page# : [True / False , None/ERROR] } PAGE_SAVED, ERROR_MESSAGE
     }
     
-    pages_to_extract = all_the_data.get(PAGES_TO_EXTRACT)
+    #pages_to_extract = all_the_data.get(PAGES_TO_EXTRACT)
     
     # Get all archived file meta data.
-    page_meta_data = []
     for rar_archived_file in cbrar.infolist():
         #print(rar_archived_file.filename, rar_archived_file.file_size, rar_archived_file.compress_size, rar_archived_file.compress_type,
         #      rar_archived_file.date_time, rar_archived_file.CRC, rar_archived_file.host_os, rar_archived_file.mode, rar_archived_file.mtime,
@@ -520,19 +539,23 @@ def modifyPages(all_the_data, cbr_file_path):
         
         # Expand ALL_PAGES to indexes and convert specific pages to indexes.
         rotate_pages_to_indexes = {}
+        rotate_all_degrees = 0
         if type(rotate_pages) == dict:
             for page, degrees in rotate_pages.items():
-                if page != ALL_PAGES:
-                    rotate_pages_to_indexes[getPageIndex(total_pages, page)] = degrees
-                else:
-                    rotate_all_degrees = degrees
+                # Pages numbers that are strings are considered disabled, ignored.
+                if type(page) != str:
+                    if page != ALL_PAGES:
+                        rotate_pages_to_indexes[getPageIndex(total_pages, page)] = degrees
+                    else:
+                        rotate_all_degrees = degrees
         else:
             rotate_all_degrees = rotate_pages
+        
         rotate_indexes = {}
         for page in page_indexes:
             if page in rotate_pages_to_indexes:
                 rotate_indexes[page] = rotate_pages_to_indexes[page]
-            else:
+            elif rotate_all_degrees:
                 rotate_indexes[page] = rotate_all_degrees
         
         for page_index, degrees in rotate_indexes.items():
@@ -577,51 +600,63 @@ def modifyPages(all_the_data, cbr_file_path):
     if combine_pages:
         for pages_to_combine in combine_pages:
             
-            page_index_one = getPageIndex(total_pages, pages_to_combine[1])
-            page_index_two = getPageIndex(total_pages, pages_to_combine[2])
-            print(f'Combine: {"Horizontally" if pages_to_combine[0]==HORIZONTAL else "Vertically"} Page: {page_index_one+1} and {page_index_two+1}')
-            
-            error = None
-            combined_image = None
-            
-            if page_index_one in page_indexes and page_index_two in page_indexes:
+            # Pages numbers that are strings are considered disabled, ignored.
+            if type(pages_to_combine[1]) != str and type(pages_to_combine[2]) != str:
                 
-                # If a previous edit has failed/errored on these pages, skip.
-                if (all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_one] or
-                    all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_two]):
-                        continue
+                page_index_one = getPageIndex(total_pages, pages_to_combine[1], False)
+                page_index_two = getPageIndex(total_pages, pages_to_combine[2], False)
                 
-                try:
-                    combined_image = combinePages(
-                        all_the_data[IMAGE_DATA][page_index_one],
-                        all_the_data[IMAGE_DATA][page_index_two],
-                        layout = pages_to_combine[0],
-                        resample = resample,
-                        resize_big_image = True
-                    )
-                except Exception as err:
-                    error = f'Image Combination Error: {err}'
+                print(f'Combine: {"Horizontally" if pages_to_combine[0]==HORIZONTAL else "Vertically"} Page: {page_index_one+1} and {page_index_two+1}')
+                
+                error = None
+                combined_image = None
+                
+                if page_index_one in page_indexes and page_index_two in page_indexes:
+                    
+                    # If a previous edit has failed/errored on these pages, skip.
+                    if (all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_one] or
+                        all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_two]):
+                            continue
+                    
+                    try:
+                        combined_image = combinePages(
+                            all_the_data[IMAGE_DATA][page_index_one],
+                            all_the_data[IMAGE_DATA][page_index_two],
+                            layout = pages_to_combine[0],
+                            resample = resample,
+                            resize_big_image = True
+                        )
+                    except Exception as err:
+                        error = f'Image Combining Error: {err}'
+                        print(error)
+                
+                else:
+                    missing_pages = ''
+                    if page_index_one not in page_indexes:
+                        missing_pages += f'{page_index_one+1}'
+                    if page_index_one not in page_indexes and page_index_two not in page_indexes:
+                        missing_pages += ' and '
+                    if page_index_two not in page_indexes:
+                        missing_pages += f'{page_index_two+1}'
+                        
+                    error = f'Image Combining Failed: Page {missing_pages} not found in PAGES_TO_EXTRACT'
                     print(error)
-            
-            else:
-                error = f'Image Combination Failed: Page not found in PAGES_TO_EXTRACT'
-                print(error)
-            
-            all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_one] = error
-            all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_two] = error
-            
-            if error:
-                continue
-            
-            elif combined_image:
-                all_the_data[IMAGE_DATA][page_index_one] = combined_image
                 
-                all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDITS_MADE][COMBINE_PAGES][page_index_one] = page_index_two
+                all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_one] = error
+                all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_two] = error
                 
-                # Second image should no longer exists now so remove it from the image and log data.
-                all_the_data[IMAGE_DATA].pop(page_index_two)
-                all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS].pop(page_index_two)
-                #all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_SAVE_PATHS].pop(page_index_two)
+                if error:
+                    continue
+                
+                elif combined_image:
+                    all_the_data[IMAGE_DATA][page_index_one] = combined_image
+                    
+                    all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDITS_MADE][COMBINE_PAGES][page_index_one] = page_index_two
+                    
+                    # Second image should no longer exists now so remove it from the image and log data.
+                    all_the_data[IMAGE_DATA].pop(page_index_two)
+                    all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS].pop(page_index_two)
+                    #all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_SAVE_PATHS].pop(page_index_two)
     
     return all_the_data
 
@@ -736,17 +771,18 @@ def createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, root_sav
 def getAllPageIndexesFromRange(total_pages, page_start = None, page_end = None):
     page_indexes = []
     
-    if page_start == None and page_end == None: # All Pages
-        page_start = 0
-        page_end = total_pages - 1
+    if ((page_start == None or type(page_start) == str) # All Pages
+        and (page_end == None or type(page_start) == str)):
+            page_start = 0
+            page_end = total_pages - 1
     
     else:
-        if not page_start:
+        if not page_start or type(page_start) == str:
             page_start = getPageIndex(total_pages, page_end)
         else:
             page_start = getPageIndex(total_pages, page_start)
         
-        if not page_end:
+        if not page_end or type(page_end) == str:
             page_end = total_pages - 1
         else:
             page_end = getPageIndex(total_pages, page_end)
@@ -769,15 +805,16 @@ def getAllPageIndexesFromRange(total_pages, page_start = None, page_end = None):
 ### that is between 0 and the total number of CBR pages.
 ###     (total_pages) Total number of pages in a CBR.
 ###     (page_number) A positive or negative page number.
+###     (keep_inbounds) Keep page number to index within the total page count.
 ###     --> Returns a [Integer]
-def getPageIndex(total_pages, page_number):
-    if page_number >= total_pages:
+def getPageIndex(total_pages, page_number, keep_inbounds = True):
+    if page_number >= total_pages and keep_inbounds:
         page_index = total_pages - 1 # last page
-    elif page_number <= -total_pages:
+    elif page_number <= -total_pages and keep_inbounds:
         page_index = 0
     elif page_number < 0:
         page_index = total_pages + page_number
-    elif page_number == 0:
+    elif page_number == 0 and keep_inbounds:
         page_index = 0
         #print(f'Page #{page_number} is out of bounds and will be disregarded.')
     else:
