@@ -33,6 +33,7 @@ Requirements:
 
 TODO:
     [X] Create log file.
+        [] Record completion times
     [] Support for other comic book file types (CBZ,CB7,CBC,etc - Many of these use the .cbr extension even though they are not using RAR compression)
     [] Add more image editing options that make sense for pages of book/magazine/etc.
         [X] Combine two pages vertically or horizontal.
@@ -46,15 +47,16 @@ TODO:
     
 '''
 
-from common_functions import MakeDirectories, ModifyImageSize, MakeList
+from common_functions import MakeDirectories, ModifyImageSize, MakeList, SortFiles
 from pathlib import Path, PurePath
-#import patoolib
-from PIL import Image
+import patoolib #pip install patool
+from PIL import Image, UnidentifiedImageError
 from os import startfile as OpenFile, walk as Search
 #from rarfile import RarFile
 import rarfile
 import re
 import sys
+import tempfile
 
 
 # UnRAR Tool (Uncommet if you don't have the RAR Archive App installed)
@@ -93,13 +95,15 @@ KEEP_FILE_PATHS_INTACT = 16
 # Log date for internal use.
 LOG_DATA = 137
 CBR_FILE_PATHS = 0
-PAGE_DATA = 1
+IMAGE_EXTENSIONS = 1
+PAGE_DATA = 2
 PAGE_INDEXES = 10
 PAGE_META_DATA = 11
 PAGE_EDITS_MADE = 12
 PAGE_SAVE_PATHS = 13
 PAGE_EDIT_ERRORS = 14
 PAGE_SAVE_ERRORS = 15
+TEMP_DIR = 3
 IMAGE_DATA = 167
 
 # Editing Pages
@@ -153,13 +157,14 @@ BILINEAR = 1
 BICUBIC = 2
 
 # CBR/RAR File Meta Data
-FILENAME = 0
-FILE_SIZE = 1
-COMPRESS_SIZE = 2
-COMPRESS_TYPE = 3
-DATE_TIME = 4
-CRC = 5
-HOST_OS = 6
+META_FILE_PATH = 0
+META_FILE_NAME = 1
+META_FILE_SIZE = 2
+META_COMPRESS_SIZE = 3
+META_COMPRESS_TYPE = 4
+META_DATE_TIME = 5
+META_CRC = 6
+META_HOST_OS = 7
 
 # RAR File Meta Data Constants
 # Compression Type
@@ -249,14 +254,14 @@ preset4 = {             # TESTING
                            'Combine fourth and fifth pages horizontally. '+
                            'Save each page in a different directory.'),
   #PAGES_TO_EXTRACT      : (-1,-10),
-  PAGES_TO_EXTRACT      : (1,-1),
-  PAGES_TO_EXTRACT      : (1,7),
+  #PAGES_TO_EXTRACT      : (1,-1),
+  #PAGES_TO_EXTRACT      : (1,5),
   #PAGES_TO_EXTRACT      : (-10, -1),
   #PAGES_TO_EXTRACT      : (10),
   #PAGES_TO_EXTRACT      : (10, -1),
   #PAGES_TO_EXTRACT      : (100, -1),
   #PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
-  #PAGES_TO_EXTRACT      : [1,4,5,-1],
+  PAGES_TO_EXTRACT      : [1,4,5,-1],
   #PAGES_TO_EXTRACT      : [10],
   CHANGE_WIDTH          : NO_CHANGE,
   #CHANGE_HEIGHT         : (DOWNSCALE, 1080),
@@ -268,7 +273,7 @@ preset4 = {             # TESTING
   #ROTATE_PAGES          : {1:90, ALL_PAGES': 180},
   #COMBINE_PAGES         : [(VERTICAL, 1, -1), (HORIZONTAL, 4, 5)],
   COMBINE_PAGES         : [(HORIZONTAL, 4, 5)], ## TODO: do not delete 2nd image after combine and allow multiple same page combines??
-  COMBINE_PAGES         : [(HORIZONTAL, 4, 5),(HORIZONTAL, 6, 7),(VERTICAL, 4, 6)],
+  COMBINE_PAGES         : [(HORIZONTAL, 2, 3),(HORIZONTAL, 4, 5),(VERTICAL, 2, 4)],
   RESAMPLING_FILTER     : BICUBIC,
   #CHANGE_IMAGE_FORMAT   : PNG,
   OVERWRITE_FILES       : True,
@@ -298,7 +303,14 @@ def changePreset(preset, all_the_data = {}):
         all_the_data = preset
         all_the_data[LOG_DATA] = {}
         all_the_data[LOG_DATA][CBR_FILE_PATHS] = []
+        all_the_data[LOG_DATA][IMAGE_EXTENSIONS] = []
         all_the_data[LOG_DATA][PAGE_DATA] = {}
+        
+        for image_formats in SUPPORTED_IMAGE_FORMATS:
+            for i in range(0, len(image_formats)):
+                if i == 0: continue
+                all_the_data[LOG_DATA][IMAGE_EXTENSIONS].append(image_formats[i])
+    
     else:
         all_the_data = preset
         all_the_data[LOG_DATA] = log_data
@@ -366,36 +378,48 @@ def preparePageData(cbr_file_path, all_the_data):
         PAGE_META_DATA : [],
         PAGE_INDEXES : [],
         PAGE_EDITS_MADE : {
-            CHANGE_HEIGHT : {},
-            CHANGE_WIDTH : {},
-            ROTATE_PAGES : {},
-            COMBINE_PAGES : {}
+            CHANGE_HEIGHT : {},## TODO: page# : (org height, cur height)
+            CHANGE_WIDTH : {}, ## TODO: page# : (org width, cur width)
+            ROTATE_PAGES : {}, ## TODO: page# : degrees
+            COMBINE_PAGES : {} ## TODO: page2 : [(page3, HORIZONTAL), ({page4 : [(page5, HORIZONTAL)]}, VERTICAL) ]
         },
         PAGE_EDIT_ERRORS : {},
         PAGE_SAVE_PATHS : {}, ## TODO: some vars to show if files have been saved, { page# : [path, save bool] }
         PAGE_SAVE_ERRORS : {} ##       or { page# : [True / False , None/ERROR] } PAGE_SAVED, ERROR_MESSAGE
     }
     
-    #pages_to_extract = all_the_data.get(PAGES_TO_EXTRACT)
-    
-    # Get all archived file meta data.
+    # Get meta data of archived files.
     for rar_archived_file in cbrar.infolist():
         #print(rar_archived_file.filename, rar_archived_file.file_size, rar_archived_file.compress_size, rar_archived_file.compress_type,
         #      rar_archived_file.date_time, rar_archived_file.CRC, rar_archived_file.host_os, rar_archived_file.mode, rar_archived_file.mtime,
         #      rar_archived_file.ctime, rar_archived_file.atime, rar_archived_file.file_redir)
-        if rar_archived_file.is_file(): ## TODO: make sure only "image files" are added?
-            all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA].append(
-                (
-                    rar_archived_file.filename,
-                    rar_archived_file.file_size,
-                    rar_archived_file.compress_size,
-                    rar_archived_file.compress_type,
-                    rar_archived_file.date_time,
-                    rar_archived_file.CRC,
-                    rar_archived_file.host_os
+        if rar_archived_file.is_file():
+            file_path = Path(rar_archived_file.filename)
+            
+            # Images files only and ignore MacOSX resource fork files.
+            if file_path.suffix in all_the_data[LOG_DATA][IMAGE_EXTENSIONS] and file_path.stem[:1] != '.':
+                all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA].append(
+                    (
+                        file_path,
+                        rar_archived_file.filename,
+                        rar_archived_file.file_size,
+                        rar_archived_file.compress_size,
+                        rar_archived_file.compress_type,
+                        rar_archived_file.date_time,
+                        rar_archived_file.CRC,
+                        rar_archived_file.host_os
+                    )
                 )
-            )
+                #print(rar_archived_file.filename)
         #if rar_archived_file.is_dir():
+    
+    #input(all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA])
+    # Sort page/image files properly.
+    all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA].sort(
+        reverse=False, key=lambda by_page_number: SortFiles(by_page_number, META_FILE_PATH, True)
+        #reverse=False, key=lambda x: int(''.join([i for i in x if str(i).isdigit()]))
+    )
+    #print(all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA])
     
     all_the_data = convertPageNumbersToIndexes(all_the_data, cbr_file_path)
     
@@ -454,7 +478,10 @@ def extractEditSavePages(all_the_data):
         # Save
         all_the_data = savePages(all_the_data, cbr_file_path)
         
-        all_the_data[IMAGE_DATA].clear() ## TODO: is this good enough, will memory be fully freed up?
+        # Clean up memory used and no longer needed.
+        all_the_data[IMAGE_DATA].clear()
+        if all_the_data[LOG_DATA].get(TEMP_DIR):
+            all_the_data[LOG_DATA][TEMP_DIR].cleanup()
     
     return all_the_data
 
@@ -474,14 +501,13 @@ def extractPages(all_the_data, cbr_file_path):
         all_the_data[IMAGE_DATA] = {}
     
     for page_index in page_indexes:
-        archived_img = cbrar_file.open(page_meta_data[page_index][FILENAME], mode='r', pwd=None)
-        #with Image.open(archived_img) as extracted_image:
-        #    all_the_data[IMAGE_DATA][page_index] = extracted_image
-        all_the_data[IMAGE_DATA][page_index] = Image.open(archived_img)
         
-        #image = all_the_data[IMAGE_DATA][page_index]
-        #image.close()
-        ## TODO: close each image when done editing and saving? image.close() ?
+        ## TODO: catch errors
+        try:
+            archived_img = cbrar_file.open(page_meta_data[page_index][META_FILE_NAME], mode='r', pwd=None)
+            all_the_data[IMAGE_DATA][page_index] = Image.open(archived_img)
+        except rarfile.Error as err:
+            print(err)
     
     return all_the_data
 
@@ -680,7 +706,7 @@ def savePages(all_the_data, cbr_file_path):
         ##       def savePage() for single page saves, retry saves for individual file overwriting
         ##       if file re-edited, mark not saved
         
-        archived_file_path = Path(page_meta_data[page_index][FILENAME])
+        archived_file_path = page_meta_data[page_index][META_FILE_PATH]
         if not keep_file_paths_intact:
             archived_file_path = Path(archived_file_path.name)
         
@@ -983,7 +1009,7 @@ def createLogFile(all_the_data, log_file_path = None):
                         text_lines.append(f'    Page {page_index_str} {arrow}{page_save_paths[page_index]}')
                     
                     if page_edit_errors[page_index]:
-                        text_lines.append(f'                    {page_edit_errors[page_index]}')
+                        text_lines.append(f'                   {page_edit_errors[page_index]}')
                 
                 else:
                     # Removed because it was combined with another page, only show if there was an error.
@@ -1085,7 +1111,6 @@ if __name__ == '__main__':
             else:
                 print(f'This is not an existing file or directory path: "{drop}"')
     
-    ## TODO:
     log_file_created = createLogFile(all_the_data)
     if log_file_created:
         print('--> Check log for more details.')
