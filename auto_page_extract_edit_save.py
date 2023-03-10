@@ -78,12 +78,13 @@ default_save_dir = Path(__file__).parent
 # Preset Options
 DESCRIPTION = 20
 PAGES_TO_EXTRACT = 0
-CHANGE_WIDTH = 1
-CHANGE_HEIGHT = 2
-KEEP_ASPECT_RATIO = 3
-ROTATE_PAGES = 4
-COMBINE_PAGES = 5
-RESAMPLING_FILTER = 6
+SORT_PAGES_BY = 1
+CHANGE_WIDTH = 2
+CHANGE_HEIGHT = 3
+KEEP_ASPECT_RATIO = 4
+ROTATE_PAGES = 5
+COMBINE_PAGES = 6
+RESAMPLING_FILTER = 7
 CHANGE_IMAGE_FORMAT = 10
 IMAGE_FORMAT_PARAMS = 11
 SEARCH_SUB_DIRS = 12
@@ -101,10 +102,18 @@ PAGE_INDEXES = 10
 PAGE_META_DATA = 11
 PAGE_EDITS_MADE = 12
 PAGE_SAVE_PATHS = 13
-PAGE_EDIT_ERRORS = 14
-PAGE_SAVE_ERRORS = 15
+PAGE_EXTRACT_ERRORS = 14
+PAGE_EDIT_ERRORS = 15
+PAGE_SAVE_ERRORS = 16
 TEMP_DIR = 3
 IMAGE_DATA = 167
+
+# Page Sort Modifiers
+ALPHA = 0          # Sort alphabetically where digits are sorted individually (100 < 99). [Default]
+ALPHA_NUMBER = 1   # Sort alphabetically with digits represented as whole numbers (100 > 99).
+NUMBERS_ONLY = 2   # Sort with numbers only, letters are ignored.
+ASCENDING = 0
+DESCENDING = 1
 
 # Editing Pages
 ALL_PAGES = 9997999
@@ -192,6 +201,8 @@ preset0 = { #           : Defaults          # If option omitted, the default val
   PAGES_TO_EXTRACT      : (1,-1),           # (1,-1) = All Pages. Examples: Range of Pages = ('Starting Page','Ending Page') or Specific Pages = [1,3,6,-1] or One Page = 3
                                             # - Negative numbers start from the last page and count backwards. Example: If 50 total pages, -1 = 50 and -7 = 43.
                                             # - Ranged numbers outside the bounds of the total pages will be forced inbounds and specific out-of-bound numbers will be ignored.
+  SORT_PAGES_BY         :(ALPHA, ASCENDING),# Before extracting, sort pages in alphabetically, alphabetically with whole numbers, or only using numbers.
+                                            # - Sort Modifiers: ALPHA, ALPHA_NUMBER, NUMBERS_ONLY, ASCENDING, DESCENDING
   CHANGE_WIDTH          : NO_CHANGE,        # Modify the width or height of all extracted pages. Numbers can be + or -, and percents = 50 or (in qoutes) '50%'.
   CHANGE_HEIGHT         : NO_CHANGE,        # - Example: (Modifier, Number)  Modifiers: NO_CHANGE, CHANGE_TO, MODIFY_BY_PIXELS, MODIFY_BY_PERCENT, UPSCALE, DOWNSCALE
   KEEP_ASPECT_RATIO     : True,             # Keep aspect ratio only if one size, width or height, has changed.
@@ -263,6 +274,7 @@ preset4 = {             # TESTING
   #PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
   PAGES_TO_EXTRACT      : [1,4,5,-1],
   #PAGES_TO_EXTRACT      : [10],
+  SORT_PAGES_BY         :(ALPHA_NUMBER, ASCENDING),
   CHANGE_WIDTH          : NO_CHANGE,
   #CHANGE_HEIGHT         : (DOWNSCALE, 1080),
   CHANGE_HEIGHT         : (MODIFY_BY_PERCENT, 50),
@@ -383,6 +395,7 @@ def preparePageData(cbr_file_path, all_the_data):
             ROTATE_PAGES : {}, ## TODO: page# : degrees
             COMBINE_PAGES : {} ## TODO: page2 : [(page3, HORIZONTAL), ({page4 : [(page5, HORIZONTAL)]}, VERTICAL) ]
         },
+        PAGE_EXTRACT_ERRORS : {}, ## TODO: {page# : [] } List of errors opening or extracting files from archive
         PAGE_EDIT_ERRORS : {},
         PAGE_SAVE_PATHS : {}, ## TODO: some vars to show if files have been saved, { page# : [path, save bool] }
         PAGE_SAVE_ERRORS : {} ##       or { page# : [True / False , None/ERROR] } PAGE_SAVED, ERROR_MESSAGE
@@ -402,24 +415,24 @@ def preparePageData(cbr_file_path, all_the_data):
                     (
                         file_path,
                         rar_archived_file.filename,
-                        rar_archived_file.file_size,
-                        rar_archived_file.compress_size,
-                        rar_archived_file.compress_type,
-                        rar_archived_file.date_time,
-                        rar_archived_file.CRC,
-                        rar_archived_file.host_os
+                        #rar_archived_file.file_size,
+                        #rar_archived_file.compress_size,
+                        #rar_archived_file.compress_type,
+                        #rar_archived_file.date_time,
+                        #rar_archived_file.CRC,
+                        #rar_archived_file.host_os
                     )
                 )
-                #print(rar_archived_file.filename)
         #if rar_archived_file.is_dir():
     
-    #input(all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA])
-    # Sort page/image files properly.
+    # Sort page/image files.
+    sort_method, sort_order = all_the_data.get(SORT_PAGES_BY, (ALPHA,ASCENDING))
+    alpha_number = True if sort_method == ALPHA_NUMBER else False
+    numbers_only = True if sort_method == NUMBERS_ONLY else False
     all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA].sort(
-        reverse=False, key=lambda by_page_number: SortFiles(by_page_number, META_FILE_PATH, True)
-        #reverse=False, key=lambda x: int(''.join([i for i in x if str(i).isdigit()]))
+        reverse = True if sort_order else False,
+        key = lambda page: SortFiles(page, META_FILE_PATH, alpha_number, numbers_only)
     )
-    #print(all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_META_DATA])
     
     all_the_data = convertPageNumbersToIndexes(all_the_data, cbr_file_path)
     
@@ -502,12 +515,34 @@ def extractPages(all_the_data, cbr_file_path):
     
     for page_index in page_indexes:
         
-        ## TODO: catch errors
         try:
             archived_img = cbrar_file.open(page_meta_data[page_index][META_FILE_NAME], mode='r', pwd=None)
-            all_the_data[IMAGE_DATA][page_index] = Image.open(archived_img)
+            #all_the_data[IMAGE_DATA][page_index] = Image.open(archived_img)
         except rarfile.Error as err:
             print(err)
+            ## TODO: Log errors
+        
+        try:
+            #all_the_data[IMAGE_DATA][page_index] = Image.open(r'C:\Users\Grahf\Documents\GitHub\Auto-Page-Extract-Edit-Save\Nintendo Power Posters 0021-a.jpg')
+            all_the_data[IMAGE_DATA][page_index] = Image.open(archived_img)
+            #all_the_data[IMAGE_DATA][page_index] = Image.frombytes('RGB', (1000,4000), archived_img)#, mode='r')
+        except (rarfile.Error, FileNotFoundError, UnidentifiedImageError, ValueError, TypeError) as err:
+            print(err)
+            
+            ## TODO: flag to use these temp files with the rest (or all) the pages?
+            
+            # Attempt to extract file with another tool. This will extract all files in the CBR file temporarily.
+            temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+            #print(temp_dir.name)
+            
+            all_the_data[LOG_DATA][TEMP_DIR] = temp_dir
+            
+            archived_file_path = page_meta_data[page_index][META_FILE_PATH]
+            extracted_file_path = Path(PurePath().joinpath(temp_dir.name, archived_file_path))
+            
+            ## TODO: try?
+            patoolib.extract_archive(cbr_file_path, outdir=temp_dir.name)
+            all_the_data[IMAGE_DATA][page_index] = Image.open(extracted_file_path)
     
     return all_the_data
 
