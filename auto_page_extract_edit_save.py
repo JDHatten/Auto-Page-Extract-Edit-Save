@@ -109,9 +109,9 @@ TEMP_DIR = 3
 IMAGE_DATA = 167
 
 # Page Sort Modifiers
-ALPHA = 0          # Sort alphabetically where digits are sorted individually (100 < 99). [Default]
-ALPHA_NUMBER = 1   # Sort alphabetically with digits represented as whole numbers (100 > 99).
-NUMBERS_ONLY = 2   # Sort with numbers only, letters are ignored.
+ALPHA = 0         # Sort alphabetically where digits are sorted individually (100 < 99). [Default]
+ALPHA_NUMBER = 1  # Sort alphabetically with digits represented as whole numbers (100 > 99).
+NUMBERS_ONLY = 2  # Sort with numbers only, letters are ignored.
 ASCENDING = 0
 DESCENDING = 1
 
@@ -135,9 +135,10 @@ WIDTH = 0
 HEIGHT = 1
 
 # File Name Modifiers
-INSERT_FILE_NAME = 0
-INSERT_PAGE_NAME = 1
-INSERT_COUNTER = 2
+INSERT_FILE_NAME = 0    # File name of CBR file.
+INSERT_PAGE_NAME = 1    # File name of archived image/page in CRB file.
+INSERT_PAGE_NUMBER = 2  # Page number of archived image/page extracted in CRB file.
+INSERT_COUNTER = 3      # Incrementing number starting from first file saved (1,2,3...).
 
 # Image Format
 BMP = ('Windows Bitmaps', '.bmp')
@@ -177,24 +178,24 @@ META_HOST_OS = 7
 
 # RAR File Meta Data Constants
 # Compression Type
-RAR_M0 = 48 # No Compression.
-RAR_M1 = 49 # Compression Level -m1 - Fastest Compression.
-RAR_M2 = 50 # Compression Level -m2
-RAR_M3 = 51 # Compression Level -m3
-RAR_M4 = 52 # Compression Level -m4
-RAR_M5 = 53 # Compression Level -m5 - Maximum Compression.
+RAR_M0 = 48  # No Compression.
+RAR_M1 = 49  # Compression Level -m1 - Fastest Compression.
+RAR_M2 = 50  # Compression Level -m2
+RAR_M3 = 51  # Compression Level -m3
+RAR_M4 = 52  # Compression Level -m4
+RAR_M5 = 53  # Compression Level -m5 - Maximum Compression.
 
 # Host OS Type
-RAR_OS_WIN32 = 2    # Windows
-RAR_OS_UNIX = 3     # UNIX
-RAR_OS_MACOS = 4    # MacOS (only in RAR3)
-RAR_OS_BEOS = 5     # BeOS (only in RAR3)
-RAR_OS_OS2 = 1      # OS2 (only in RAR3)
-RAR_OS_MSDOS = 0    # MSDOS (only in RAR3)
+RAR_OS_WIN32 = 2  # Windows
+RAR_OS_UNIX = 3   # UNIX
+RAR_OS_MACOS = 4  # MacOS (only in RAR3)
+RAR_OS_BEOS = 5   # BeOS (only in RAR3)
+RAR_OS_OS2 = 1    # OS2 (only in RAR3)
+RAR_OS_MSDOS = 0  # MSDOS (only in RAR3)
 
 
 ### Select the default preset to use here. Can be changed again once script is running.
-selected_preset = 4
+selected_preset = 3
 
 preset0 = { #           : Defaults          # If option omitted, the default value will be used.
   DESCRIPTION           : '',               # Description of this preset.
@@ -214,8 +215,9 @@ preset0 = { #           : Defaults          # If option omitted, the default val
   IMAGE_FORMAT_PARAMS   : None,             ## TODO: Extra Image Format Parameters
   SEARCH_SUB_DIRS       : False,            # After searching a directory also search it's sub-directories if True.
   OVERWRITE_FILES       : False,            # If file with the same name and path already exists overwrite it if True.
-  MODIFY_FILE_NAMES     : None,             # Rename extracted pages with a modified file name. File Name Modifier: INSERT_FILE_NAME, INSERT_PAGE_NAME, INSERT_COUNTER
-                                            # - Example: ['Start-', INSERT_FILE_NAME,'-X-',INSERT_PAGE_NAME] = 'Start-FileName-X-Page001.jpg'
+  MODIFY_FILE_NAMES     : None,             # Rename each extracted image/page with a modified file name.
+                                            # - File Name Modifier: INSERT_FILE_NAME, INSERT_PAGE_NAME, INSERT_PAGE_NUMBER, INSERT_COUNTER
+                                            # - Example: [ 'From-(', INSERT_FILE_NAME,')-Page-(',INSERT_PAGE_NAME ] = 'From-(FileName)-Page-(F001).jpg'
   SAVE_DIR_PATH         : default_save_dir, # Absolute or relative paths accepted. Default: r'{this script root path}/{CBR file name}/'
                                             # - Use a List to change save directory path on each page. Example: ['path/to/dir1', 'path/to/dir2',...]
                                             # - The save paths index will repeat if the amount of pages is greater than this list size.
@@ -247,7 +249,7 @@ preset2 = {             # Example Preset 2
 preset3 = {             # Example Preset 3
   DESCRIPTION           : ('Extract pages 1-7 and downscale height to 1080p. '+
                            'Combine fourth, fifth, sixth and seventh pages in a box layout. '+
-                           'Save each file with a page number as a PNG.'),
+                           'Save each file with the page number as a PNG.'),
   PAGES_TO_EXTRACT      : (1,7),
   CHANGE_WIDTH          : NO_CHANGE,
   CHANGE_HEIGHT         : (DOWNSCALE, 1080),
@@ -256,7 +258,7 @@ preset3 = {             # Example Preset 3
   RESAMPLING_FILTER     : BICUBIC,
   CHANGE_IMAGE_FORMAT   : PNG,
   OVERWRITE_FILES       : True,
-  MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-',INSERT_COUNTER],
+  MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-Page-',INSERT_PAGE_NUMBER],
   KEEP_FILE_PATHS_INTACT: False
 }
 preset4 = {             # TESTING
@@ -266,13 +268,13 @@ preset4 = {             # TESTING
                            'Save each page in a different directory.'),
   #PAGES_TO_EXTRACT      : (-1,-10),
   #PAGES_TO_EXTRACT      : (1,-1),
-  #PAGES_TO_EXTRACT      : (1,5),
+  PAGES_TO_EXTRACT      : (1,5),
   #PAGES_TO_EXTRACT      : (-10, -1),
   #PAGES_TO_EXTRACT      : (10),
   #PAGES_TO_EXTRACT      : (10, -1),
   #PAGES_TO_EXTRACT      : (100, -1),
   #PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
-  PAGES_TO_EXTRACT      : [1,4,5,-1],
+  #PAGES_TO_EXTRACT      : [1,4,5,-1],
   #PAGES_TO_EXTRACT      : [10],
   SORT_PAGES_BY         :(ALPHA_NUMBER, ASCENDING),
   CHANGE_WIDTH          : NO_CHANGE,
@@ -290,7 +292,7 @@ preset4 = {             # TESTING
   #CHANGE_IMAGE_FORMAT   : PNG,
   OVERWRITE_FILES       : True,
   #MODIFY_FILE_NAMES     : (INSERT_FILE_NAME,'-01', ' (', INSERT_PAGE_NAME, ')'),
-  MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-01','--',INSERT_COUNTER],
+  MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-01','--',INSERT_PAGE_NUMBER],
   SAVE_DIR_PATH         : r'test\dir',
   #SAVE_DIR_PATH         : [r'test\dir1',r'test\dir2',r'test\dir3'],
   #SAVE_DIR_PATH         : {1 : r'test\dir1', 4 : r'test\dir2', -1 : r'test\dir3', ALL_PAGES : r'test\dir' }, ##TODO:
@@ -762,7 +764,7 @@ def savePages(all_the_data, cbr_file_path):
         else:
             save_to_directory_path = MakeDirectories(default_save_dir, cbr_file.stem)
         
-        save_file_path = createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, save_to_directory_path, counter)
+        save_file_path = createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, save_to_directory_path, page_index+1, counter)
         counter += 1
         
         all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_SAVE_PATHS][page_index] = save_file_path
@@ -790,9 +792,10 @@ def savePages(all_the_data, cbr_file_path):
 ###     (cbr_file_path) A Path to a CBR file.
 ###     (archived_file_path) The local file path within the archive file.
 ###     (root_save_path) The full root Path to where the file is to be saved.
+###     (page_number) Page Number.
 ###     (counter) Incrementing number counter.
 ###     --> Returns a [Path]
-def createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, root_save_path, counter = 0):
+def createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, root_save_path, page_number, counter = 0):
     format_change = all_the_data.get(CHANGE_IMAGE_FORMAT)
     modify_file_names = all_the_data.get(MODIFY_FILE_NAMES)
     
@@ -806,10 +809,13 @@ def createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, root_sav
                     file_name += cbr_file_path.stem
                 elif text == INSERT_PAGE_NAME:
                     file_name += archived_file_path.stem
+                elif text == INSERT_PAGE_NUMBER:
+                    file_name += f'{page_number}'
                 elif text == INSERT_COUNTER:
-                    file_name += str(counter)
+                    file_name += f'{counter}'
     else:
         file_name = archived_file_path.stem
+    
     if format_change:
         file_ext = format_change[1]
     else:
