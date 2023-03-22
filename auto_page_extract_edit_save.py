@@ -38,7 +38,7 @@ TODO:
     [] Add more image editing options that make sense for pages of book/magazine/etc.
         [X] Combine two pages vertically or horizontal.
         [X] Rotate pages/images.
-        [] Combine up to 4 pages and add a BOX layout. OR stick with multiple stacked combines? (2,3 + 2,4 = 2,3,4)
+        [] Combine up to 4 pages and add a BOX layout. OR stick with multiple stacked combines? (2,3 + 4,5 + 2,4 = 2,3,4,5)
     [] GUI
     [] Write better error messages. Add errors to log file.
     [X] Incrementing numbers for page file names.
@@ -278,11 +278,11 @@ preset4 = {             # TESTING
   #PAGES_TO_EXTRACT      : [10],
   SORT_PAGES_BY         :(ALPHA_NUMBER, ASCENDING),
   CHANGE_WIDTH          : NO_CHANGE,
-  #CHANGE_HEIGHT         : (DOWNSCALE, 1080),
-  CHANGE_HEIGHT         : (MODIFY_BY_PERCENT, 50),
+  CHANGE_HEIGHT         : (DOWNSCALE, 1080),
+  #CHANGE_HEIGHT         : (MODIFY_BY_PERCENT, 50),
   KEEP_ASPECT_RATIO     : True,
   #ROTATE_PAGES          : 180,
-  #ROTATE_PAGES          : {1:90, 4:180, 5:90, -1:180},
+  ROTATE_PAGES          : {1:90, 4:180, 5:90, -1:180},
   #ROTATE_PAGES          : {4:180, 5:90},
   #ROTATE_PAGES          : {1:90, ALL_PAGES': 180},
   #COMBINE_PAGES         : [(VERTICAL, 1, -1), (HORIZONTAL, 4, 5)],
@@ -392,10 +392,10 @@ def preparePageData(cbr_file_path, all_the_data):
         PAGE_META_DATA : [],
         PAGE_INDEXES : [],
         PAGE_EDITS_MADE : {
-            CHANGE_HEIGHT : {},## TODO: page# : (org height, cur height)
-            CHANGE_WIDTH : {}, ## TODO: page# : (org width, cur width)
-            ROTATE_PAGES : {}, ## TODO: page# : degrees
-            COMBINE_PAGES : {} # Done
+            CHANGE_HEIGHT : {},
+            CHANGE_WIDTH : {},
+            ROTATE_PAGES : {},
+            COMBINE_PAGES : {}
         },
         PAGE_EXTRACT_ERRORS : {}, ## TODO: {page# : [] } List of errors opening or extracting files from archive
         PAGE_EDIT_ERRORS : {},
@@ -525,9 +525,7 @@ def extractPages(all_the_data, cbr_file_path):
             ## TODO: Log errors
         
         try:
-            #all_the_data[IMAGE_DATA][page_index] = Image.open(r'C:\Users\Grahf\Documents\GitHub\Auto-Page-Extract-Edit-Save\Nintendo Power Posters 0021-a.jpg')
             all_the_data[IMAGE_DATA][page_index] = Image.open(archived_img)
-            #all_the_data[IMAGE_DATA][page_index] = Image.frombytes('RGB', (1000,4000), archived_img)#, mode='r')
         except (rarfile.Error, FileNotFoundError, UnidentifiedImageError, ValueError, TypeError) as err:
             print(err)
             
@@ -578,14 +576,22 @@ def modifyPages(all_the_data, cbr_file_path):
             error = None
         except Exception as err: ## TODO: what errors can happen? stop and 'continue' on error?
             error = f'Image Resize Failed: {err}'
+            if width_change:
+                error_code = CHANGE_WIDTH
+            else:
+                error_code = CHANGE_HEIGHT
             print(error)
-            
-        all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index] = error
+            all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index] = {error_code : error}
         
         if error:
             continue
         else:
             page_images[page_index] = resized_image
+            all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDITS_MADE][CHANGE_WIDTH][page_index] = (image.width, resized_image.width)
+            all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDITS_MADE][CHANGE_HEIGHT][page_index] = (image.height, resized_image.height)
+            
+            #print(f'Width: {image.width}->{resized_image.width}')
+            #input(f'Height: {image.height}->{resized_image.height}')
     
     if rotate_pages:
         
@@ -636,7 +642,7 @@ def modifyPages(all_the_data, cbr_file_path):
             if page_index in page_indexes:
                 
                 # If a previous edit has failed/errored on this page, skip it.
-                if all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index]:
+                if all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS].get(page_index):
                     continue
                 
                 try:
@@ -648,17 +654,18 @@ def modifyPages(all_the_data, cbr_file_path):
                 except Exception as err:
                     error = f'Image Rotation Failed: {err}'
                     print(error)
+                    all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index] = {ROTATE_PAGES : error}
             
             else:
                 error = f'Image Rotation Failed: Page not found in PAGES_TO_EXTRACT'
                 print(error)
-            
-            all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index] = error
+                all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index] = {ROTATE_PAGES : error}
             
             if error:
                 continue
             elif rotated_image:
                 all_the_data[IMAGE_DATA][page_index] = rotated_image
+                all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDITS_MADE][ROTATE_PAGES][page_index] = degrees
     
     if combine_pages:
         for pages_to_combine in combine_pages:
@@ -679,8 +686,8 @@ def modifyPages(all_the_data, cbr_file_path):
                 if page_index_one in page_indexes and page_index_two in page_indexes:
                     
                     # If a previous edit has failed/errored on these pages, skip.
-                    if (all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_one] or
-                        all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_two]):
+                    if (all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS].get(page_index_one) or
+                        all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS].get(page_index_two)):
                             continue
                     
                     try:
@@ -694,6 +701,8 @@ def modifyPages(all_the_data, cbr_file_path):
                     except Exception as err:
                         error = f'Image Combining Error: {err}'
                         print(error)
+                        all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_one] = {COMBINE_PAGES : error}
+                        all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_two] = {COMBINE_PAGES : error}
                 
                 else:
                     missing_pages = ''
@@ -706,9 +715,8 @@ def modifyPages(all_the_data, cbr_file_path):
                         
                     error = f'Image Combining Failed: Page {missing_pages} not found in PAGES_TO_EXTRACT'
                     print(error)
-                
-                all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_one] = error
-                all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_two] = error
+                    all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_one] = {COMBINE_PAGES : error}
+                    all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS][page_index_two] = {COMBINE_PAGES : error}
                 
                 if error:
                     continue
@@ -726,19 +734,23 @@ def modifyPages(all_the_data, cbr_file_path):
                     if combine_first_page_log:
                         if combine_second_page_log:
                             combine_first_page_log.append( ({page_index_two : combine_second_page_log.copy()}, layout_direction) )
-                            combine_log.pop(page_index_two)
+                            #combine_log[page_index_two] = page_index_one
+                            #combine_log.pop(page_index_two)
                         else:
                             combine_first_page_log.append((page_index_two, layout_direction))
                     else:
                         if combine_second_page_log:
                             combine_log[page_index_one] = [({page_index_two : combine_second_page_log.copy()}, layout_direction)]
-                            combine_log.pop(page_index_two)
+                            #combine_log[page_index_two] = page_index_one
+                            #combine_log.pop(page_index_two)
                         else:
                             combine_log[page_index_one] = [(page_index_two, layout_direction)]
                     
+                    combine_log[page_index_two] = page_index_one
+                    
                     # Second image should no longer exists now so remove it from the image and log data.
                     all_the_data[IMAGE_DATA].pop(page_index_two)
-                    all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS].pop(page_index_two)
+                    #all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDIT_ERRORS].pop(page_index_two)
                     #all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_SAVE_PATHS].pop(page_index_two)
     
     return all_the_data
@@ -989,14 +1001,12 @@ def rotatePage(image, angle = 0, resample = NEAREST):
     return image
 
 
-### Create log file for all playlists created.
+### Create log file for all CBR page/images created.
 ###     (all_the_data) A Dictionary of all the details on how to handle CBR files and logs of everthing done so far.
 ###     (log_file_path) Path of a log file.
 ###     --> Returns a [Boolean]
 def createLogFile(all_the_data, log_file_path = None):
     log_file_created = False
-    base_arrow = '-------> '
-    
     log_data = all_the_data.get(LOG_DATA)
     
     if log_data:
@@ -1038,50 +1048,97 @@ def createLogFile(all_the_data, log_file_path = None):
             text_lines.append('\nDescription of the preset used to extract, edit, and save page files:')
             text_lines.append(f'  {desc}')
         
+        base_arrow = '----> '
+        
         for cbr_file_path, page_data in log_data[PAGE_DATA].items():
-            text_lines.append('\nCBR File Path')
-            text_lines.append(f'  {cbr_file_path}')
+            #text_lines.append('\nCBR File Path')
+            #text_lines.append(f'  {cbr_file_path}')
+            text_lines.append(f'\nCBR File --> {cbr_file_path}')
             
             page_save_paths = page_data.get(PAGE_SAVE_PATHS, {})
             page_edit_errors = page_data.get(PAGE_EDIT_ERRORS, {})
             page_save_errors = page_data.get(PAGE_SAVE_ERRORS, {})
             page_edits_made = page_data.get(PAGE_EDITS_MADE, {})
+            
+            pages_resized_width = page_edits_made.get(CHANGE_WIDTH, {})
+            pages_resized_height = page_edits_made.get(CHANGE_HEIGHT, {})
+            pages_rotated = page_edits_made.get(ROTATE_PAGES, {})
             pages_combined = page_edits_made.get(COMBINE_PAGES, {})
             
             for page_index in page_data[PAGE_INDEXES]:
                 
                 arrow = base_arrow[len(str(page_index)):]
+                indentation = '          '
+                indentation += '    '[:len(str(page_index))]
+                #indentation += '---'
                 
-                if page_index in page_save_paths:
-                    
-                    if page_save_errors[page_index]:
-                        text_lines.append(f'    Page {page_index+1} {arrow}{page_save_errors[page_index]}')
-                    
-                    else:
-                        page_str = f'{page_index+1}'
-                        
-                        # Check if this is a combined page (combined index: #-#)
-                        if not page_edit_errors[page_index] and page_index in pages_combined:
-                            #page_str += f'-{pages_combined[page_index]+1}'
-                            all_pages_combined_with_this_page_index = pages_combined.get(page_index, [])
-                            page_str = getAllPagesCombined(all_pages_combined_with_this_page_index, f'({page_str}')
-                            page_str += ' [Combined Into One Image/Page]'
-                            
-                            text_lines.append(f'    Pages {page_str}')
-                            text_lines.append(f'           {arrow}{page_save_paths[page_index]}')
-                        
-                        else:
-                            arrow = base_arrow[len(page_str):]
-                            text_lines.append(f'    Page {page_str} {arrow}{page_save_paths[page_index]}')
-                        
-                    
-                    if page_edit_errors[page_index]:
-                        text_lines.append(f'           {arrow}{page_edit_errors[page_index]}')
+                if page_save_errors.get(page_index):
+                    text_lines.append(f'    Page {page_index+1} {arrow}ERROR: {page_save_errors[page_index]}')
+                    ## TODO: still show the edits/errors made before the save file error?
                 
                 else:
+                    page_str = f'{page_index+1}'
+                    arrow = base_arrow[len(page_str):]
+                    edit_errors = page_edit_errors.get(page_index, {})
+                    
+                    # Page Number and File Path
+                    if page_index in page_save_paths:
+                        text_lines.append(f'    Page {page_str} {arrow}{page_save_paths[page_index]}')
+                    else:
+                        final_page_combined = page_index
+                        final_page_combined_str = ''
+                        if page_index in pages_combined:
+                            final_page_combined_index = pages_combined[page_index]
+                            while type(final_page_combined_index) == int:
+                                final_page_combined = final_page_combined_index
+                                final_page_combined_index = pages_combined[final_page_combined_index]
+                            final_page_combined_str = f'(Page {final_page_combined+1}) '
+                            #print(f' {final_page_combined_str}  {final_page_combined}')
+                        #print(f' {final_page_combined_str}  {final_page_combined}')
+                        
+                        # Save Path is to final page combined with.
+                        text_lines.append(f'    Page {page_str} {arrow}{final_page_combined_str}{page_save_paths[final_page_combined]}')
+                    
+                    # Page Resize
+                    if CHANGE_WIDTH not in edit_errors or CHANGE_HEIGHT not in edit_errors:
+                        if page_index in pages_resized_width or page_index in pages_resized_height:
+                            org_size = f'{pages_resized_width[page_index][0]} x {pages_resized_height[page_index][0]}'
+                            new_size = f'{pages_resized_width[page_index][1]} x {pages_resized_height[page_index][1]}'
+                            text_lines.append(f'{indentation}{arrow}   Page Size Changed From: [ {org_size} -to- {new_size} ]')
+                    else:
+                        error_data = edit_errors.get(CHANGE_WIDTH)
+                        error_data = error_data if error_data else edit_errors.get(CHANGE_HEIGHT)
+                        text_lines.append(f'{indentation}{arrow}   ERROR: {error_data}')
+                    
+                    # Page Rotation
+                    if ROTATE_PAGES not in edit_errors:
+                        if page_index in pages_rotated:
+                            degrees = pages_rotated[page_index]
+                            text_lines.append(f'{indentation}{arrow}   Page Rotated: [ {degrees} Degrees ]')
+                    else:
+                        text_lines.append(f'{indentation}{arrow}   ERROR: {edit_errors[ROTATE_PAGES]}')
+                    
+                    # Page Combines
+                    if COMBINE_PAGES not in edit_errors:
+                        if page_index in pages_combined:
+                            other_page_index = pages_combined[page_index]
+                            if type(other_page_index) == int:
+                                pages_combined_str = f'[ Page {other_page_index+1} & {page_str} ]'
+                            else:
+                                pages_combined_str = f'[ Page {page_str} & '
+                                all_pages_combined_with_this_page_index = pages_combined.get(page_index, [])
+                                pages_combined_str = getAllPagesCombined(all_pages_combined_with_this_page_index, pages_combined_str)
+                            
+                            text_lines.append(f'{indentation}{arrow}   Pages Combined: {pages_combined_str}')
+                    else:
+                        text_lines.append(f'{indentation}{arrow}   ERROR: {edit_errors[COMBINE_PAGES]}')
+                
+                #if page_edit_errors.get(page_index):
+                #    text_lines.append(f'    ----------{arrow}{page_edit_errors[page_index]}')
+                #else:
                     # Removed because it was combined with another page, only show if there was an error.
-                    if page_index in page_edit_errors:
-                        text_lines.append(f'    Page {page_index+1} {arrow}{page_edit_errors[page_index]}')
+                #    if page_index in page_edit_errors:
+                #        text_lines.append(f'    Page {page_index+1} {arrow}{page_edit_errors[page_index]}')
         
         # Write Log File
         try:
@@ -1099,19 +1156,19 @@ def createLogFile(all_the_data, log_file_path = None):
 
 ### Create string showing all pages combined for use in log file.
 ###     (all_pages_combined_list) List of pages combined and the layout direction.
-###     (page_str) String added to log file that shows all pages combined.
+###     (pages_combined_str) String added to log file that shows all pages combined.
 ###     --> Returns a [String]
-def getAllPagesCombined(all_pages_combined_list, page_str):
+def getAllPagesCombined(all_pages_combined_list, pages_combined_str):
     for combined_page in all_pages_combined_list:
-        direction = 'h' if combined_page[1] == HORIZONTAL else 'v'
+        direction = 'Horizontally' if combined_page[1] == HORIZONTAL else 'Vertically'
         if type(combined_page[0]) == int:
-            page_str += f'-{combined_page[0]+1}{direction})'
+            pages_combined_str += f'{combined_page[0]+1} {direction} ]'
         else:
             for next_page_combined, additional_pages in combined_page[0].items():
-                page_str += f'{direction}({next_page_combined+1}'
-                page_str = getAllPagesCombined(additional_pages, page_str)
+                pages_combined_str += f'-[ {direction} ]-[ Page {next_page_combined+1} & '
+                pages_combined_str = getAllPagesCombined(additional_pages, pages_combined_str)
     
-    return page_str
+    return pages_combined_str
 
 
 ### Get the overall log numbers on how many pages have been extracted, edited, and saved as well as any errors.
