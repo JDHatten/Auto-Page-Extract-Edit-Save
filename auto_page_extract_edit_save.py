@@ -46,7 +46,7 @@ TODO:
     [] GUI
     [X] Write better error messages. Add errors to log file.
     [X] Incrementing numbers for page file names.
-    [] Extra image format parameters. Optimization, Quality, Subsampling, etc.
+    [X] Extra image format parameters. Optimization, Quality, Subsampling, etc.
     [] Ask before overwriting files.
     
 '''
@@ -72,7 +72,7 @@ ROTATE_PAGES = 5
 COMBINE_PAGES = 6
 RESAMPLING_FILTER = 7
 CHANGE_IMAGE_FORMAT = 10
-IMAGE_FORMAT_PARAMS = 11
+IMAGE_SAVING_PARAMS = 11
 SEARCH_SUB_DIRS = 12
 OVERWRITE_FILES = 13
 MODIFY_FILE_NAMES = 14
@@ -111,7 +111,7 @@ INSERT_COUNTER = 3      # Incrementing number starting from first file saved (1,
 # Image Formats
 BMP = ('Windows Bitmaps', '.bmp')
 GIF = ('Graphics Interchange Format', '.gif', 'gifv')
-ICO = ('Windows Icon', '.ico')  # Available Sizes: 16x16, 24x24, 32x32*, 48x48, 64x64, 128x128, 256x256**, *Default, **Maximum
+ICO = ('Windows Icon', '.ico')  ## TODO: Available Sizes: 16x16*, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256**, *Default, **Maximum
 JPG = ('JPEG', '.jpg', '.jpeg', '.jpe')
 JP2 = ('JPEG 2000', '.jp2')
 PBM = ('Portable Image Format', '.pbm', '.pgm', '.ppm', '.pxm', '.pnm')
@@ -121,7 +121,6 @@ TIF = ('TIFF', '.tif', '.tiff')
 WEB = ('Web Picture', '.webp')
 SUPPORTED_IMAGE_FORMATS = [BMP, GIF, ICO, JPG, JP2, PBM, PNG, RAS, TIF, WEB]
 
-## TODO:
 # Extra Image Saving Parameters
 QUALITY = 0       # Quality settings are equivalent to the Photoshop settings with possible values between 0-100. (JPEG, TIFF, WEBP Only)
 QUANT_TABLES = 1  # Quantization Tables - Note: specific values are not supported here, only preset values accepted. (JPEG Only)
@@ -130,9 +129,9 @@ OPTIMIZE = 3      # Possible optimization values are True or False. (GIF, JPEG, 
 PROGRESSIVE = 4   # Possible progressive values are True or False. (JPEG Only)
 COMPRESSION = 5   # Possible compress levels are between 1-9, default 6, and auto-set to 9 if OPTIMIZE is set to True. (BMP, PNG Only)
                   # - Note: BMP only allows values between 1-2 (1 = 256 Colors, 2 = 16 Colors)
-# The following JPEG presets are available by default:
-# 'web_low', 'web_medium', 'web_high', 'web_very_high', 'web_maximum', 'low', 'medium', 'high', 'maximum'.
-# To apply a preset use   IMAGE_FORMAT_PARAMS : { QUALITY : 'preset_name' }
+# The following presets are available by default:
+# 'keep', 'web_low', 'web_medium', 'web_high', 'web_very_high', 'web_maximum', 'low', 'medium', 'high', 'maximum'.
+# To apply a preset use   IMAGE_SAVING_PARAMS : { QUALITY : 'preset_name' }
 # To apply 'only' the quantization table use    { QUANT_TABLES : 'preset_name' }
 # To apply 'only' the subsampling setting use   { SUBSAMPLING : 'preset_name' }
 
@@ -177,7 +176,7 @@ preset0 = { #           : Defaults          # If option omitted, the default val
   PAGES_TO_EXTRACT      : (1,-1),           # (1,-1) = All Pages. Examples: Range of Pages = ('Starting Page','Ending Page') or Specific Pages = [1,3,6,-1] or One Page = 3
                                             # - Negative numbers start from the last page and count backwards. Example: If 50 total pages, -1 = 50 and -7 = 43.
                                             # - Ranged numbers outside the bounds of the total pages will be forced inbounds and specific out-of-bound numbers will be ignored.
-  SORT_PAGES_BY         :(ALPHA, ASCENDING),# Before extracting, sort pages in alphabetically, alphabetically with whole numbers, or only using numbers.
+  SORT_PAGES_BY         :(ALPHA, ASCENDING),# Before extracting, sort pages alphabetically, alphabetically with whole numbers, or only using numbers.
                                             # - Sort Modifiers: ALPHA, ALPHA_NUMBER, NUMBERS_ONLY, ASCENDING, DESCENDING
   CHANGE_WIDTH          : NO_CHANGE,        # Modify the width or height of all extracted pages. Numbers can be + or -, and percents = 50 or (in qoutes) '50%'.
   CHANGE_HEIGHT         : NO_CHANGE,        # - Example: (Modifier, Number)  Modifiers: NO_CHANGE, CHANGE_TO, MODIFY_BY_PIXELS, MODIFY_BY_PERCENT, UPSCALE, DOWNSCALE
@@ -187,8 +186,8 @@ preset0 = { #           : Defaults          # If option omitted, the default val
   COMBINE_PAGES         : None,             # Combine two pages from PAGES_TO_EXTRACT. Example: [(VERTICAL,1,2),(HORIZONTAL,3,4),...]
   RESAMPLING_FILTER     : NEAREST,          # When editing a page/image use this resampling filter. Examples: NEAREST, BILINEAR, BICUBIC
   CHANGE_IMAGE_FORMAT   : NO_CHANGE,        # Change the image format of a page too... BMP, GIF, ICO, JPG, JP2, PBM, PNG, RAS, TIF, WEB
-  IMAGE_FORMAT_PARAMS   : None,             ## TODO: Extra JPEG Image Format Parameters: QUALITY, QUANT_TABLES, SUBSAMPLING, OPTIMIZE, PROGRESSIVE, COMPRESSION
-                                            ## - Examples: {QUALITY : 90, QUANT_TABLES : 'high', SUBSAMPLING : 1, OPTIMIZE : True, PROGRESSIVE : False, COMPRESSION : 7}
+  IMAGE_SAVING_PARAMS   : None,             # Extra Image Saving Parameters: QUALITY, QUANT_TABLES, SUBSAMPLING, OPTIMIZE, PROGRESSIVE, COMPRESSION
+                                            # - Examples: {QUALITY : 90, QUANT_TABLES : 'high', SUBSAMPLING : 1, OPTIMIZE : True, PROGRESSIVE : False, COMPRESSION : 7}
   SEARCH_SUB_DIRS       : False,            # After searching a directory also search it's sub-directories if True.
   OVERWRITE_FILES       : False,            # If file with the same name and path already exists overwrite it if True.
   MODIFY_FILE_NAMES     : None,             # Rename each extracted image/page with a modified file name.
@@ -200,7 +199,7 @@ preset0 = { #           : Defaults          # If option omitted, the default val
                                             # - Extracted page file names can be the same if each is saved in a different directory.
   KEEP_FILE_PATHS_INTACT: True,             # When extracting pages/files they may be in one or more folders. So when saving, stick with the same file structure.
                                             # If False, all extracted pages/files will be placed directly in the SAVE_DIR_PATH and there may be file name conflicts.
-}                                           # Note: Any 'pages numbers' that are 'strings' are considered disabled, ignored. Example: 5 -> '5'
+}                                           # Note: Any 'pages numbers' that are 'strings' are considered disabled and ignored. Example: 5 -> '5'
                                             #       This is mainly for use in the app. Page numbers are used in: PAGES_TO_EXTRACT, ROTATE_PAGES, COMBINE_PAGES
 ##TODO: Some preset options:
 #                         "Thumbnail" first page,
@@ -242,13 +241,9 @@ preset4 = {             # TESTING
                            'Downscaled height to 1080p. '+
                            'Combine fourth and fifth pages horizontally. '+
                            'Save each page in a different directory.'),
-  #PAGES_TO_EXTRACT      : (-1,-10),
-  #PAGES_TO_EXTRACT      : (1,-1),
   #PAGES_TO_EXTRACT      : (1,5),
   #PAGES_TO_EXTRACT      : (-10, -1),
-  #PAGES_TO_EXTRACT      : (10),
-  #PAGES_TO_EXTRACT      : (10, -1),
-  #PAGES_TO_EXTRACT      : (100, -1),
+  #PAGES_TO_EXTRACT      : 10,
   #PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
   #PAGES_TO_EXTRACT      : [1,4,5,-1],
   PAGES_TO_EXTRACT      : [1,4,5,-2,-1],
@@ -267,7 +262,8 @@ preset4 = {             # TESTING
   COMBINE_PAGES         : [(HORIZONTAL, 4, 5), (HORIZONTAL, -1, 1)],
   #COMBINE_PAGES         : [(HORIZONTAL, 2, 3),(HORIZONTAL, 4, 5),(VERTICAL, 2, 4)],
   RESAMPLING_FILTER     : BICUBIC,
-  #CHANGE_IMAGE_FORMAT   : PNG,
+  CHANGE_IMAGE_FORMAT   : PNG,
+  IMAGE_SAVING_PARAMS   : {QUALITY : 10, SUBSAMPLING : 2, COMPRESSION : 1, OPTIMIZE : True},
   OVERWRITE_FILES       : True,
   #MODIFY_FILE_NAMES     : (INSERT_FILE_NAME,'-01', ' (', INSERT_PAGE_NAME, ')'),
   MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-01','--',INSERT_PAGE_NUMBER],
@@ -644,22 +640,8 @@ def modifyPages(all_the_data, cbr_file_path):
                 page_images[page_index] = resized_image
                 all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDITS_MADE][CHANGE_WIDTH][page_index] = (image.width, resized_image.width)
                 all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDITS_MADE][CHANGE_HEIGHT][page_index] = (image.height, resized_image.height)
-                
-                #print(f'Width: {image.width}->{resized_image.width}')
-                #input(f'Height: {image.height}->{resized_image.height}')
     
     if rotate_pages:
-        
-        # Rotate All Pages
-        '''if type(rotate_pages) == int:
-            degrees = rotate_pages
-            rotate_pages = {}
-            page_index_done = True
-            for page in page_indexes:
-                rotate_pages[page] = degrees
-        
-        else:
-            page_index_done = False'''
         
         # Expand ALL_PAGES to indexes and convert specific pages to indexes.
         rotate_pages_to_indexes = {}
@@ -688,11 +670,6 @@ def modifyPages(all_the_data, cbr_file_path):
             if all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EXTRACT_ERRORS].get(page_index):
                 if len(all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EXTRACT_ERRORS][page_index]) > 1:
                     continue
-            
-            '''if page_index_done:
-                page_index = page
-            else:
-                page_index = getPageIndex(total_pages, page)'''
             
             print(f'Rotate Page: {page_index+1} {degrees} Degress')
             
@@ -889,7 +866,8 @@ def savePages(all_the_data, cbr_file_path):
             all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_SAVE_DETAILS][page_index] = NEW_SAVE
         
         try:
-            image.save(save_file_path)
+            params = getExtraSaveImageParams(all_the_data, save_file_path.suffix)
+            image.save(save_file_path, **params)
             error = None
         except (OSError, ValueError) as err:
             error = f'Failed To Save Page/Image: {err}'
@@ -942,6 +920,88 @@ def createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, root_sav
     save_file_path = Path(PurePath().joinpath(root_save_path, f'{file_name}{file_ext}'))
     
     return save_file_path
+
+
+### Get any extra image saving parameters to use before finally saving an image file.
+###     (all_the_data) A Dictionary of all the details on how to handle CBR files and logs of everthing done so far.
+###     (format) Format or extension of image file to be saved.
+###     --> Returns a [Dictionary]
+def getExtraSaveImageParams(all_the_data, format):
+    save_params = {}
+    extra_image_saving_params = all_the_data.get(IMAGE_SAVING_PARAMS, {})
+    compress_min, compress_max = 1, 9
+    param_presets = ['keep', 'web_low', 'web_medium', 'web_high', 'web_very_high',
+                     'web_maximum', 'low', 'medium', 'high', 'maximum']
+    quality_min, quality_max = 1, 100
+    subsampling_options = {0: '4:4:4', 1 : '4:2:2', 2 : '4:2:0'}
+    
+    for param, value in extra_image_saving_params.items():
+        
+        if param == QUALITY:
+            if value in param_presets:
+                save_params['quality'] = value
+            elif type(value) == int and value < compress_min:
+                save_params['quality'] = compress_min
+            elif type(value) == int and value > quality_max:
+                save_params['quality'] = quality_max
+            elif type(value) == int:
+                save_params['quality'] = value
+            else: # Defaults
+                print(f'- Warning: Unknown "Quality" value used: "{value}", default value used instead.')
+                if format in WEB:
+                    save_params['quality'] = 80
+                else:
+                    save_params['quality'] = 75
+        
+        elif param == QUANT_TABLES: # Only presets accepted
+            if value in param_presets:
+                save_params['qtables'] = value
+            elif format in JPG: # Default
+                save_params['qtables'] = param_presets[0]
+                print(f'- Warning: Unknown "Quantization Table" preset value used: "{value}"')
+            #else: # ignore entirely
+        
+        elif param == SUBSAMPLING:
+            if (value in param_presets or
+                value in subsampling_options.keys() or
+                value in subsampling_options.values()):
+                    save_params['subsampling'] = value
+            elif format in JPG: # Default
+                save_params['subsampling'] = param_presets[0]
+                print(f'- Warning: Unknown "Subsampling" value used: "{value}"')
+            # else ignore entirely
+        
+        elif param == OPTIMIZE:
+            if type(value) == bool:
+                save_params['optimize'] = value
+            else: # Default
+                save_params['optimize'] = False
+        
+        elif param == PROGRESSIVE:
+            if type(value) == bool:
+                save_params['progressive'] = value
+            else: # Default
+                save_params['progressive'] = False
+        
+        elif param == COMPRESSION:
+            if format in BMP:
+                if value in [1,2]:
+                    save_params['compression'] = value
+                else: # Default
+                    print(f'- Warning: Unknown "Compression" value used: "{value}", default value used instead.')
+                    save_params['compression'] = 1
+            elif format in PNG:
+                if type(value) == int and value < compress_min:
+                    save_params['compress_level'] = compress_min
+                elif type(value) == int and value > compress_max:
+                    save_params['compress_level'] = compress_max
+                elif type(value) == int:
+                    save_params['compress_level'] = value
+                else: # Default
+                    print(f'- Warning: Unknown "Compression" value used: "{value}", default value used instead.')
+                    save_params['compress_level'] = 6
+    
+    return save_params
 
 
 ### Return a List of all page numbers from a range of numbers or just one number. If any numbers falls
