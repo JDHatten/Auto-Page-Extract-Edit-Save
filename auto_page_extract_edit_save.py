@@ -111,23 +111,25 @@ INSERT_COUNTER = 3      # Incrementing number starting from first file saved (1,
 # Image Formats
 BMP = ('Windows Bitmaps', '.bmp')
 GIF = ('Graphics Interchange Format', '.gif', 'gifv')
-ICO = ('Windows Icon', '.ico')  ## TODO: Available Sizes: 16x16*, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256**, *Default, **Maximum
-JPG = ('JPEG', '.jpg', '.jpeg', '.jpe')
+ICN = ('MacOS Icon', '.icns')
+ICO = ('Windows Icon', '.ico')
 JP2 = ('JPEG 2000', '.jp2')
+JPG = ('JPEG', '.jpg', '.jpeg', '.jpe')
 PBM = ('Portable Image Format', '.pbm', '.pgm', '.ppm', '.pxm', '.pnm')
 PNG = ('Portable Network Graphics', '.png')
 RAS = ('Sun Rasters', '.ras', '.ras', '.sun', '.sr')
 TIF = ('TIFF', '.tif', '.tiff')
 WEB = ('Web Picture', '.webp')
-SUPPORTED_IMAGE_FORMATS = [BMP, GIF, ICO, JPG, JP2, PBM, PNG, RAS, TIF, WEB]
+SUPPORTED_IMAGE_FORMATS = [BMP, GIF, ICN, ICO, JP2, JPG, PBM, PNG, RAS, TIF, WEB]
 
 # Extra Image Saving Parameters
-QUALITY = 0       # Quality settings are equivalent to the Photoshop settings with possible values between 0-100. (JPEG, TIFF, WEBP Only)
+QUALITY = 0       # Quality settings are equivalent to the Photoshop settings with possible values between 0-100, default 75. (JPEG, TIFF, WEBP Only)
 QUANT_TABLES = 1  # Quantization Tables - Note: specific values are not supported here, only preset values accepted. (JPEG Only)
 SUBSAMPLING = 2   # Possible subsampling values are 0, 1 and 2 that correspond to 4:4:4, 4:2:2 and 4:2:0, respectively. (JPEG Only)
 OPTIMIZE = 3      # Possible optimization values are True or False. (GIF, JPEG, PNG Only)
 PROGRESSIVE = 4   # Possible progressive values are True or False. (JPEG Only)
-COMPRESSION = 5   # Possible compress levels are between 1-9, default 6, and auto-set to 9 if OPTIMIZE is set to True. (BMP, PNG Only)
+SIZES = 5         # Default: [(16,16), (24,24), (32,32), (48,48), (64,64), (128,128), (256,256)] - Maximum Size: 256 (ICO Only)
+COMPRESSION = 6   # Possible compress levels are between 1-9, default 6, and auto-set to 9 if OPTIMIZE is set to True. (BMP, PNG Only)
                   # - Note: BMP only allows values between 1-2 (1 = 256 Colors, 2 = 16 Colors)
 # The following presets are available by default:
 # 'keep', 'web_low', 'web_medium', 'web_high', 'web_very_high', 'web_maximum', 'low', 'medium', 'high', 'maximum'.
@@ -241,12 +243,12 @@ preset4 = {             # TESTING
                            'Downscaled height to 1080p. '+
                            'Combine fourth and fifth pages horizontally. '+
                            'Save each page in a different directory.'),
-  #PAGES_TO_EXTRACT      : (1,5),
+  PAGES_TO_EXTRACT      : (1,5),
   #PAGES_TO_EXTRACT      : (-10, -1),
   #PAGES_TO_EXTRACT      : 10,
   #PAGES_TO_EXTRACT      : [1,4,5,-1,203,0,97,-100,-122,-133,-169],
   #PAGES_TO_EXTRACT      : [1,4,5,-1],
-  PAGES_TO_EXTRACT      : [1,4,5,-2,-1],
+  #PAGES_TO_EXTRACT      : [1,4,5,-2,-1],
   #PAGES_TO_EXTRACT      : [10],
   SORT_PAGES_BY         :(ALPHA_NUMBER, ASCENDING),
   CHANGE_WIDTH          : NO_CHANGE,
@@ -259,17 +261,17 @@ preset4 = {             # TESTING
   #ROTATE_PAGES          : {1:90, ALL_PAGES': 180},
   #COMBINE_PAGES         : [(VERTICAL, 1, -1), (HORIZONTAL, 4, 5)],
   #COMBINE_PAGES         : [(HORIZONTAL, 4, 5)], ## TODO: do not delete 2nd image after combine and allow multiple same page combines??
-  COMBINE_PAGES         : [(HORIZONTAL, 4, 5), (HORIZONTAL, -1, 1)],
-  #COMBINE_PAGES         : [(HORIZONTAL, 2, 3),(HORIZONTAL, 4, 5),(VERTICAL, 2, 4)],
+  #COMBINE_PAGES         : [(HORIZONTAL, 4, 5), (HORIZONTAL, -1, 1)],
+  COMBINE_PAGES         : [(HORIZONTAL, 2, 3),(HORIZONTAL, 4, 5),(VERTICAL, 2, 4)],
   RESAMPLING_FILTER     : BICUBIC,
-  CHANGE_IMAGE_FORMAT   : PNG,
-  IMAGE_SAVING_PARAMS   : {QUALITY : 10, SUBSAMPLING : 2, COMPRESSION : 1, OPTIMIZE : True},
+  CHANGE_IMAGE_FORMAT   : ICO,
+  IMAGE_SAVING_PARAMS   : {QUALITY : 10, SUBSAMPLING : 2, COMPRESSION : 1, OPTIMIZE : True, SIZES : [(32,32),(128,128)]},
   OVERWRITE_FILES       : True,
   #MODIFY_FILE_NAMES     : (INSERT_FILE_NAME,'-01', ' (', INSERT_PAGE_NAME, ')'),
   MODIFY_FILE_NAMES     : [INSERT_FILE_NAME,'-01','--',INSERT_PAGE_NUMBER],
   SAVE_DIR_PATH         : r'test\dir',
   #SAVE_DIR_PATH         : [r'test\dir1',r'test\dir2',r'test\dir3'],
-  #SAVE_DIR_PATH         : {1 : r'test\dir1', 4 : r'test\dir2', -1 : r'test\dir3', ALL_PAGES : r'test\dir' }, ##TODO:
+  #SAVE_DIR_PATH         : {1 : r'test\dir1', 4 : r'test\dir2', -1 : r'test\dir3', ALL_PAGES : r'test\dir' },
   KEEP_FILE_PATHS_INTACT: False
 }
 
@@ -611,11 +613,12 @@ def modifyPages(all_the_data, cbr_file_path):
     rotate_pages = all_the_data.get(ROTATE_PAGES)
     combine_pages = all_the_data.get(COMBINE_PAGES)
     resample = all_the_data.get(RESAMPLING_FILTER, NEAREST)
+    format_change = all_the_data.get(CHANGE_IMAGE_FORMAT)
     
     page_images = all_the_data.get(IMAGE_DATA, {})
     total_pages = len(page_meta_data)
     
-    if width_change or height_change:
+    if (width_change or height_change) and format_change != ICO:
         
         for page_index, image in page_images.items():
             
@@ -843,8 +846,15 @@ def savePages(all_the_data, cbr_file_path):
         else:
             save_to_directory_path = MakeDirectories(default_save_dir, cbr_file.stem)
         
-        ## TODO: insert page number of all combined pages?
-        save_file_path = createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, save_to_directory_path, page_index+1, counter)
+        # Get all page numbers if pages combined
+        combined_page_log = all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_EDITS_MADE][COMBINE_PAGES].get(page_index)
+        if type(combined_page_log) == list:
+            page_number = getCombinedPageNumbers({ page_index : combined_page_log })
+        else:
+            page_number = f'{page_index+1}'
+        #print(f'page_number: {page_number}')
+        
+        save_file_path = createFilePathFrom(all_the_data, cbr_file_path, archived_file_path, save_to_directory_path, page_number, counter)
         counter += 1
         
         all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_SAVE_PATHS][page_index] = save_file_path
@@ -878,6 +888,22 @@ def savePages(all_the_data, cbr_file_path):
         #all_the_data[LOG_DATA][PAGE_DATA][cbr_file_path][PAGE_SAVE_DETAILS][page_index] = error
     
     return all_the_data
+
+
+### Get all page numberss combined as a string.
+###     (combined_page_log) A Dictionary log of all pages combined.
+###     --> Returns a [String]
+def getCombinedPageNumbers(combined_page_log):
+    sep = '-' ## TODO: user option?
+    for page_index, pages_combined in combined_page_log.items():
+        page_number = f'{page_index+1}'
+        for combined_page in pages_combined:
+            if type(combined_page[0]) == int:
+                page_number += f'{sep}{combined_page[0]+1}'
+            else: # Recursive
+                page_number += f'{sep}{getCombinedPageNumbers(combined_page[0])}'
+    
+    return page_number
 
 
 ### Create a full file Path from an extracted page/image file. Format change are made here as well as
@@ -958,7 +984,7 @@ def getExtraSaveImageParams(all_the_data, format):
                 save_params['qtables'] = value
             elif format in JPG: # Default
                 save_params['qtables'] = param_presets[0]
-                print(f'- Warning: Unknown "Quantization Table" preset value used: "{value}"')
+                print(f'- Warning: Unknown JPEG "Quantization Table" preset value used: "{value}"')
             #else: # ignore entirely
         
         elif param == SUBSAMPLING:
@@ -968,7 +994,7 @@ def getExtraSaveImageParams(all_the_data, format):
                     save_params['subsampling'] = value
             elif format in JPG: # Default
                 save_params['subsampling'] = param_presets[0]
-                print(f'- Warning: Unknown "Subsampling" value used: "{value}"')
+                print(f'- Warning: Unknown JPEG "Subsampling" value used: "{value}"')
             # else ignore entirely
         
         elif param == OPTIMIZE:
@@ -983,12 +1009,19 @@ def getExtraSaveImageParams(all_the_data, format):
             else: # Default
                 save_params['progressive'] = False
         
+        elif param == SIZES:
+            if format in ICO:
+                if type(value) == list and type(value[0]) == tuple and type(value[0][0]) == int:
+                    save_params['sizes'] = value
+                else: # Default: [(16,16), (24,24), (32,32), (48,48), (64,64), (128,128), (256,256)]
+                    print(f'- Warning: Unknown ICO List "Sizes" used: "{value}", default sizes used instead.')
+        
         elif param == COMPRESSION:
             if format in BMP:
                 if value in [1,2]:
                     save_params['compression'] = value
                 else: # Default
-                    print(f'- Warning: Unknown "Compression" value used: "{value}", default value used instead.')
+                    print(f'- Warning: Unknown BMP "Compression" value used: "{value}", default value used instead.')
                     save_params['compression'] = 1
             elif format in PNG:
                 if type(value) == int and value < compress_min:
@@ -998,7 +1031,7 @@ def getExtraSaveImageParams(all_the_data, format):
                 elif type(value) == int:
                     save_params['compress_level'] = value
                 else: # Default
-                    print(f'- Warning: Unknown "Compression" value used: "{value}", default value used instead.')
+                    print(f'- Warning: Unknown PNG "Compression" value used: "{value}", default value used instead.')
                     save_params['compress_level'] = 6
     
     return save_params
